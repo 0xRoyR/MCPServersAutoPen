@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 from tools.base import BaseTool, ToolResult
 from execution.runner import run_command
+from parsers.nmap_parser import parse_nmap_output
 
 
 class NmapInput(BaseModel):
@@ -28,5 +29,8 @@ class NmapTool(BaseTool):
 
         if code != 0:
             return ToolResult(success=False, output=err)
+
+        # Parse and store results in database
+        parse_nmap_output(out, data.target)
 
         return ToolResult(success=True, output=out)

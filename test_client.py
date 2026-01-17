@@ -85,6 +85,52 @@ async def test_server():
             except Exception as e:
                 print(f"Error: {e}")
 
+            # Test 4: Httpx (requires httpx installed)
+            print("\n[Test 4] Httpx probe on 'https://example.com'")
+            print("-" * 40)
+            try:
+                result = await session.call_tool("run_httpx", {
+                    "target": "https://example.com",
+                    "status_code": True,
+                    "title": True,
+                    "tech_detect": True,
+                    "timeout": 10,
+                    "max_time": 30
+                })
+                output = result.content[0].text
+                if output:
+                    print(f"Result:\n{output[:500]}")
+                else:
+                    print("No output (or httpx not installed)")
+            except Exception as e:
+                print(f"Error: {e}")
+
+            # Test 5: Gobuster (requires gobuster and a wordlist)
+            print("\n[Test 5] Gobuster dir scan on 'https://example.com'")
+            print("-" * 40)
+            print("Note: This test requires a wordlist file. Using a common path.")
+            try:
+                # Common wordlist paths - adjust as needed
+                wordlist = "/usr/share/wordlists/dirb/common.txt"  # Linux
+                # wordlist = "C:\\wordlists\\common.txt"  # Windows example
+                result = await session.call_tool("run_gobuster", {
+                    "mode": "dir",
+                    "target": "https://example.com",
+                    "wordlist": wordlist,
+                    "threads": 10,
+                    "timeout": 10,
+                    "max_time": 60,
+                    "no_error": True,
+                    "quiet": True
+                })
+                output = result.content[0].text
+                if output:
+                    print(f"Result:\n{output[:500]}")
+                else:
+                    print("No output (or gobuster not installed/wordlist not found)")
+            except Exception as e:
+                print(f"Error: {e}")
+
             print("\n" + "=" * 60)
             print("Test Complete")
             print("=" * 60)
