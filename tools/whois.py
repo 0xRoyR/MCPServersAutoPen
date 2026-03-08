@@ -2,7 +2,6 @@ from pydantic import BaseModel, Field
 
 from tools.base import BaseTool, ToolResult
 from execution.runner import run_command
-from parsers.whois_parser import parse_whois_output
 
 
 class WhoisInput(BaseModel):
@@ -22,7 +21,6 @@ class WhoisTool(BaseTool):
         if code != 0:
             return ToolResult(success=False, output=err)
 
-        # Parse and store results in database
-        parse_whois_output(out, data.target)
-
+        # Raw output is returned to the agent.
+        # DB persistence is handled by the agent via the backend API.
         return ToolResult(success=True, output=out)

@@ -3,6 +3,9 @@ from tools.whois import WhoisTool
 from tools.subfinder import SubfinderTool
 from tools.httpx import HttpxTool
 from tools.gobuster import GobusterTool
+from tools.curl import CurlTool
+from tools.sqlmap import SqlmapTool
+from tools.waybackurls import WaybackurlsTool
 
 TOOLS = [
     NmapTool(),
@@ -10,4 +13,7 @@ TOOLS = [
     SubfinderTool(),
     HttpxTool(),
     GobusterTool(),
+    CurlTool(),
+    SqlmapTool(),
+    WaybackurlsTool(),
 ]

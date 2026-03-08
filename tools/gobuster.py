@@ -1,19 +1,27 @@
+import os
+from pathlib import Path
 from typing import Optional, Literal
 from pydantic import BaseModel, Field
 
 from tools.base import BaseTool, ToolResult
 from execution.runner import run_command
-from parsers.gobuster_parser import parse_gobuster_output
+
+# Wordlist is resolved from AUTOPEN_WORDLISTS_DIR env var (if set),
+# otherwise falls back to MCPServersAutoPen/wordlists/.
+_WORDLISTS_DIR = Path(os.environ.get(
+    "AUTOPEN_WORDLISTS_DIR",
+    Path(__file__).parent.parent / "wordlists",
+))
+GOBUSTER_WORDLIST = str(_WORDLISTS_DIR / "http-directories-wordlist.txt")
 
 
 class GobusterInput(BaseModel):
     mode: Literal["dir", "dns", "vhost"] = Field(default="dir", description="Gobuster mode: dir, dns, or vhost")
     target: str = Field(description="Target URL (for dir/vhost) or domain (for dns)")
-    wordlist: str = Field(description="Path to wordlist file")
     extensions: Optional[str] = Field(default=None, description="File extensions to search for (e.g., 'php,html,txt')")
     status_codes: Optional[str] = Field(default=None, description="Status codes to match (e.g., '200,204,301')")
     exclude_status: Optional[str] = Field(default=None, description="Status codes to exclude (e.g., '404,403')")
-    threads: int = Field(default=10, description="Number of concurrent threads")
+    threads: int = Field(default=30, description="Number of concurrent threads")
     timeout: int = Field(default=10, description="HTTP timeout in seconds")
     max_time: int = Field(default=300, description="Maximum total execution time in seconds")
     follow_redirect: bool = Field(default=False, description="Follow redirects")
@@ -27,9 +35,18 @@ class GobusterTool(BaseTool):
     input_model = GobusterInput
 
     def run(self, data: GobusterInput) -> ToolResult:
+        if not Path(GOBUSTER_WORDLIST).exists():
+            return ToolResult(
+                success=False,
+                output=(
+                    f"Wordlist not found: {GOBUSTER_WORDLIST}\n"
+                    "Place http-directories-wordlist.txt in MCPServersAutoPen/wordlists/ "
+                    "or set the AUTOPEN_WORDLISTS_DIR environment variable."
+                ),
+            )
+
         cmd = ["gobuster", data.mode]
 
-        # Target flag depends on mode
         if data.mode == "dir":
             cmd += ["-u", data.target]
         elif data.mode == "dns":
@@ -37,7 +54,7 @@ class GobusterTool(BaseTool):
         elif data.mode == "vhost":
             cmd += ["-u", data.target]
 
-        cmd += ["-w", data.wordlist]
+        cmd += ["-w", GOBUSTER_WORDLIST]
         cmd += ["-t", str(data.threads)]
         cmd += ["--timeout", f"{data.timeout}s"]
 
@@ -65,13 +82,9 @@ class GobusterTool(BaseTool):
         except Exception as e:
             return ToolResult(success=False, output=f"Error: {str(e)}")
 
-        # Gobuster may return non-zero even with results
         output = out if out else err
         if not output:
             return ToolResult(success=False, output="gobuster returned no output")
 
-        # Parse and store results in database (only for dir mode)
-        if data.mode == "dir":
-            parse_gobuster_output(output, data.target)
-
+        # Raw output returned to agent. DB persistence via backend API.
         return ToolResult(success=True, output=output)

@@ -3,7 +3,6 @@ from pydantic import BaseModel, Field
 
 from tools.base import BaseTool, ToolResult
 from execution.runner import run_command
-from parsers.subfinder_parser import parse_subfinder_output
 
 
 class SubfinderInput(BaseModel):
@@ -62,8 +61,5 @@ class SubfinderTool(BaseTool):
         if code != 0:
             return ToolResult(success=False, output=err)
 
-        # Parse and store results in database
-        if data.domain:
-            parse_subfinder_output(out, data.domain)
-
+        # Raw output returned to agent. DB persistence via backend API.
         return ToolResult(success=True, output=out)

@@ -3,7 +3,6 @@ from pydantic import BaseModel, Field
 
 from tools.base import BaseTool, ToolResult
 from execution.runner import run_command
-from parsers.httpx_parser import parse_httpx_output
 
 
 class HttpxInput(BaseModel):
@@ -17,7 +16,7 @@ class HttpxInput(BaseModel):
     follow_redirects: bool = Field(default=True, description="Follow HTTP redirects")
     timeout: int = Field(default=10, description="Timeout in seconds per request")
     max_time: int = Field(default=120, description="Maximum total execution time in seconds")
-    threads: int = Field(default=50, description="Number of concurrent threads")
+    threads: int = Field(default=30, description="Number of concurrent threads")
     silent: bool = Field(default=False, description="Silent mode, only output results")
 
 
@@ -70,8 +69,6 @@ class HttpxTool(BaseTool):
         if code != 0 and not out:
             return ToolResult(success=False, output=err if err else "httpx failed with no output")
 
-        # Parse and store results in database
+        # Raw output returned to agent. DB persistence via backend API.
         output = out if out else err
-        parse_httpx_output(output, data.target)
-
         return ToolResult(success=True, output=output)
