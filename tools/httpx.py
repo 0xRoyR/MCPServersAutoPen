@@ -18,11 +18,32 @@ class HttpxInput(BaseModel):
     max_time: int = Field(default=120, description="Maximum total execution time in seconds")
     threads: int = Field(default=30, description="Number of concurrent threads")
     silent: bool = Field(default=False, description="Silent mode, only output results")
+    # Authentication support — for re-running recon in authenticated/privileged context
+    headers: Optional[dict] = Field(
+        default=None,
+        description=(
+            "Custom HTTP headers to send with every request. "
+            "Use to pass Authorization tokens or session cookies for authenticated probing. "
+            "Example: {\"Authorization\": \"Bearer eyJ...\", \"Cookie\": \"session=abc\"}"
+        ),
+    )
+    cookies: Optional[str] = Field(
+        default=None,
+        description=(
+            "Cookie string to include with every request (e.g. 'session=abc123; csrf=xyz'). "
+            "Convenience field — equivalent to setting Cookie in headers."
+        ),
+    )
 
 
 class HttpxTool(BaseTool):
     name = "run_httpx"
-    description = "Run httpx for HTTP probing and analysis"
+    description = (
+        "Run httpx for HTTP probing and analysis. "
+        "Supports both unauthenticated and authenticated scanning via the 'headers' and 'cookies' fields. "
+        "Use authenticated mode (with session cookies/JWT) to probe endpoints that require auth, "
+        "revealing different status codes and page titles than unauthenticated scans."
+    )
     input_model = HttpxInput
 
     def run(self, data: HttpxInput) -> ToolResult:
@@ -60,6 +81,14 @@ class HttpxTool(BaseTool):
 
         if data.silent:
             cmd.append("-silent")
+
+        # Inject authentication headers
+        merged_headers = dict(data.headers or {})
+        if data.cookies:
+            merged_headers["Cookie"] = data.cookies
+
+        for header_name, header_value in merged_headers.items():
+            cmd += ["-H", f"{header_name}: {header_value}"]
 
         try:
             code, out, err = run_command(cmd, timeout=data.max_time + 10)

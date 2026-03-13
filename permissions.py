@@ -19,6 +19,13 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_waybackurls",
     ],
 
+    # Target profiling + account registration
+    "profile_agent": [
+        "run_curl",
+        "run_httpx",
+        "run_gobuster",
+    ],
+
     # WAF detection + bypass profiling
     "waf_bypass_agent": [
         "run_curl",
@@ -62,6 +69,60 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
     "info_disclosure_exploit_agent": [
         "run_curl",
     ],
+
+    # Auth Bypass (single-phase)
+    "auth_bypass_agent": [
+        "run_curl",
+        "run_sqlmap",
+    ],
+
+    # Cookie / JWT manipulation (single-phase)
+    "cookie_jwt_agent": [
+        "run_curl",
+    ],
+
+    # Business Logic Errors (single-phase)
+    "logic_errors_agent": [
+        "run_curl",
+    ],
+
+    # Path Traversal / LFI pipeline
+    "path_traversal_recon_agent": [
+        "run_curl",
+        "run_httpx",
+    ],
+    "path_traversal_exploit_agent": [
+        "run_curl",
+    ],
+
+    # XXE pipeline
+    "xxe_recon_agent": [
+        "run_curl",
+        "run_httpx",
+    ],
+    "xxe_exploit_agent": [
+        "run_curl",
+    ],
+
+    # IDOR / BAC pipeline
+    "idor_recon_agent": [
+        "run_curl",
+        "run_httpx",
+        "run_gobuster",
+    ],
+    "idor_exploit_agent": [
+        "run_curl",
+    ],
+
+    # Escalation coordinator — analysis only, no MCP tools
+    "escalation_agent": [],
+
+    # Authenticated re-recon — re-runs gobuster/httpx/curl with privileged session
+    "authenticated_recon_agent": [
+        "run_curl",
+        "run_gobuster",
+        "run_httpx",
+    ],
 }
 
 # Special sentinel: if agent_id is this value, all tools are allowed.
@@ -92,4 +153,5 @@ def is_tool_allowed(agent_id: str, tool_name: str, all_tool_names: list[str]) ->
     if allowed is None:
         return False  # Unknown agent — deny
 
+    # Escalation agent has no tools but is a known agent — return False for any tool
     return tool_name in allowed

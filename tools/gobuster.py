@@ -27,11 +27,32 @@ class GobusterInput(BaseModel):
     follow_redirect: bool = Field(default=False, description="Follow redirects")
     no_error: bool = Field(default=True, description="Don't display errors")
     quiet: bool = Field(default=False, description="Quiet mode, minimal output")
+    # Authentication support — for re-running recon in authenticated/privileged context
+    headers: Optional[dict] = Field(
+        default=None,
+        description=(
+            "Custom HTTP headers to include with every request. "
+            "Use this to pass session cookies or Authorization tokens for authenticated scanning. "
+            "Example: {\"Authorization\": \"Bearer eyJ...\", \"Cookie\": \"session=abc\"}"
+        ),
+    )
+    cookies: Optional[str] = Field(
+        default=None,
+        description=(
+            "Cookie string to include with every request (e.g. 'session=abc123; csrf=xyz'). "
+            "Convenience field — equivalent to setting Cookie in headers."
+        ),
+    )
 
 
 class GobusterTool(BaseTool):
     name = "run_gobuster"
-    description = "Run gobuster for directory/DNS/vhost brute-forcing"
+    description = (
+        "Run gobuster for directory/DNS/vhost brute-forcing. "
+        "Supports both unauthenticated and authenticated scanning via the 'headers' and 'cookies' fields. "
+        "Use authenticated mode (with session cookies/JWT) to discover endpoints that return 200 "
+        "instead of 401/403 when a valid session is present."
+    )
     input_model = GobusterInput
 
     def run(self, data: GobusterInput) -> ToolResult:
@@ -70,6 +91,14 @@ class GobusterTool(BaseTool):
 
             if data.follow_redirect:
                 cmd.append("-r")
+
+            # Inject authentication headers
+            merged_headers = dict(data.headers or {})
+            if data.cookies:
+                merged_headers["Cookie"] = data.cookies
+
+            for header_name, header_value in merged_headers.items():
+                cmd += ["-H", f"{header_name}: {header_value}"]
 
         if data.no_error:
             cmd.append("--no-error")
