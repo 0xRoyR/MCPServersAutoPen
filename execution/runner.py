@@ -28,6 +28,11 @@ def run_command(cmd: list[str], timeout: int = 120, stdin_input: Optional[str] =
     Prints every line of stdout/stderr to the MCP server terminal in real time
     as the tool runs — exactly as if you had typed the command yourself.
 
+    Non-UTF-8 bytes are replaced with '?' rather than crashing.
+    If a stream reader thread hits any error it logs the problem and returns
+    whatever output it accumulated up to that point — the process keeps running
+    and the other stream keeps being read.
+
     Disable live output with: MCP_LIVE_OUTPUT=0
     """
     cmd_str = " ".join(str(c) for c in cmd)
@@ -38,7 +43,9 @@ def run_command(cmd: list[str], timeout: int = 120, stdin_input: Optional[str] =
     kwargs: dict = {
         "stdout": subprocess.PIPE,
         "stderr": subprocess.PIPE,
-        "text": True,
+        # Binary mode — we decode manually with errors='replace' so bad bytes
+        # (e.g. from gobuster scanning paths with non-UTF-8 chars) never crash us.
+        "text": False,
         "shell": False,
     }
 
@@ -54,30 +61,41 @@ def run_command(cmd: list[str], timeout: int = 120, stdin_input: Optional[str] =
     stdout_lines: list[str] = []
     stderr_lines: list[str] = []
 
-    def _read_stream(stream, lines: list[str], color: str) -> None:
-        """Read a stream line-by-line, print live, and accumulate."""
-        for raw_line in stream:
-            line = raw_line.rstrip("\n")
-            lines.append(line)
+    def _read_stream(stream, lines: list[str], color: str, label: str) -> None:
+        """
+        Read a binary stream line-by-line, decode with replacement for bad bytes,
+        print live, and accumulate. Any exception is caught so the thread always
+        exits cleanly — partial output accumulated so far is preserved in `lines`.
+        """
+        try:
+            for raw_bytes in stream:
+                line = raw_bytes.rstrip(b"\n").decode("utf-8", errors="replace")
+                lines.append(line)
+                if _LIVE:
+                    _print(f"{color}{line}{_C_RESET}")
+        except Exception as exc:
+            # Log the error but don't re-raise — preserves everything read so far
+            err_msg = f"[{label} reader error: {exc}]"
+            lines.append(err_msg)
             if _LIVE:
-                _print(f"{color}{line}{_C_RESET}")
+                _print(f"{_C_WARN}{err_msg}{_C_RESET}")
 
     t0 = time.monotonic()
     try:
         proc = subprocess.Popen(cmd, **kwargs)
 
         t_out = threading.Thread(target=_read_stream,
-                                 args=(proc.stdout, stdout_lines, _C_STDOUT),
+                                 args=(proc.stdout, stdout_lines, _C_STDOUT, "stdout"),
                                  daemon=True)
         t_err = threading.Thread(target=_read_stream,
-                                 args=(proc.stderr, stderr_lines, _C_STDERR),
+                                 args=(proc.stderr, stderr_lines, _C_STDERR, "stderr"),
                                  daemon=True)
         t_out.start()
         t_err.start()
 
         if stdin_input is not None:
             try:
-                proc.stdin.write(stdin_input)
+                proc.stdin.write(stdin_input.encode("utf-8", errors="replace"))
                 proc.stdin.close()
             except BrokenPipeError:
                 pass

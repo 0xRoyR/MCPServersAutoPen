@@ -167,14 +167,15 @@ async def call_tool(
         )
 
     elapsed = time.monotonic() - t0
-    if _DEBUG_MODE:
-        output_preview = (result.output or "")[:300].replace("\n", "↵")
-        print(
-            f"[MCP] DONE  tool={request.tool_name}  success={result.success}  "
-            f"elapsed={elapsed:.2f}s  output_len={len(result.output or '')}  "
-            f"preview={output_preview!r}",
-            flush=True,
-        )
+    output = result.output or ""
+    print(
+        f"\033[90m→ {request.tool_name}  success={result.success}  "
+        f"elapsed={elapsed:.2f}s  output_len={len(output)}\033[0m\n"
+        f"\033[90m{output[:2000]}\033[0m" if output else
+        f"\033[90m→ {request.tool_name}  success={result.success}  "
+        f"elapsed={elapsed:.2f}s  (no output)\033[0m",
+        flush=True,
+    )
 
     return {
         "success": result.success,

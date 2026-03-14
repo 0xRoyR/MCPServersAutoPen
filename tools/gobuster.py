@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from tools.base import BaseTool, ToolResult
 from execution.runner import run_command
 
-GOBUSTER_WORDLIST = "/usr/share/dirb/wordlists/big.txt"
+GOBUSTER_WORDLIST = "/usr/share/dirb/wordlists/small.txt"
 
 
 class GobusterInput(BaseModel):
