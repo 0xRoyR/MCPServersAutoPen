@@ -14,13 +14,33 @@ Auth: X-Internal-Key header (same shared secret used by backend ↔ agent server
 Future: Replace with per-agent server instances (Option A). See TODO.md #1.
 """
 
+import argparse
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
 # Make sure imports from the MCP server root work
 sys.path.insert(0, str(Path(__file__).parent))
+
+# ── CLI flags ──────────────────────────────────────────────────────────────────
+# Parse --debug / --verbose before uvicorn starts so we can set env vars
+# that runner.py reads at import time.
+#
+#   python server_http.py --debug          # full command + output logging
+#   python server_http.py --debug --port 5003
+#
+_parser = argparse.ArgumentParser(description="AutoPen MCP HTTP Server", add_help=False)
+_parser.add_argument("--debug", action="store_true", help="Enable verbose tool execution logging")
+_parser.add_argument("--verbose", action="store_true", help="Alias for --debug")
+_parser.add_argument("--port", type=int, default=None, help="Port to listen on (overrides MCP_HTTP_PORT env var)")
+_args, _ = _parser.parse_known_args()
+
+_DEBUG_MODE = _args.debug or _args.verbose
+if _DEBUG_MODE:
+    os.environ["MCP_DEBUG"] = "1"
+    print("[MCP] Debug mode ON — tool commands, timing, and output will be logged to stdout", flush=True)
 
 # Load .env — check MCPServersAutoPen/.env first, then AutoPenAgents/.env
 from dotenv import load_dotenv
@@ -115,10 +135,21 @@ async def call_tool(
     if not tool:
         raise HTTPException(status_code=404, detail=f"Tool not found: {request.tool_name}")
 
+    if _DEBUG_MODE:
+        print(
+            f"[MCP] CALL  agent={request.agent_id}  tool={request.tool_name}  "
+            f"args={request.arguments}",
+            flush=True,
+        )
+
+    t0 = time.monotonic()
     try:
         input_data = tool.input_model(**request.arguments)
         result = tool.run(input_data)
     except Exception as e:
+        elapsed = time.monotonic() - t0
+        if _DEBUG_MODE:
+            print(f"[MCP] ERROR tool={request.tool_name}  elapsed={elapsed:.2f}s  err={e}", flush=True)
         return JSONResponse(
             status_code=200,  # Return 200 even on tool failure — the result carries success=False
             content={
@@ -127,6 +158,16 @@ async def call_tool(
                 "tool": request.tool_name,
                 "agent_id": request.agent_id,
             }
+        )
+
+    elapsed = time.monotonic() - t0
+    if _DEBUG_MODE:
+        output_preview = (result.output or "")[:300].replace("\n", "↵")
+        print(
+            f"[MCP] DONE  tool={request.tool_name}  success={result.success}  "
+            f"elapsed={elapsed:.2f}s  output_len={len(result.output or '')}  "
+            f"preview={output_preview!r}",
+            flush=True,
         )
 
     return {
@@ -138,6 +179,7 @@ async def call_tool(
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("MCP_HTTP_PORT", 5003))
-    print(f"[MCP HTTP Server] Starting on port {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    port = _args.port or int(os.environ.get("MCP_HTTP_PORT", 5003))
+    log_level = "debug" if _DEBUG_MODE else "info"
+    print(f"[MCP HTTP Server] Starting on port {port}  debug={_DEBUG_MODE}")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level=log_level)

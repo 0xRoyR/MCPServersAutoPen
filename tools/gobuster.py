@@ -27,6 +27,7 @@ class GobusterInput(BaseModel):
     follow_redirect: bool = Field(default=False, description="Follow redirects")
     no_error: bool = Field(default=True, description="Don't display errors")
     quiet: bool = Field(default=False, description="Quiet mode, minimal output")
+    insecure: bool = Field(default=True, description="Skip TLS certificate verification (recommended for pentest targets)")
     # Authentication support — for re-running recon in authenticated/privileged context
     headers: Optional[dict] = Field(
         default=None,
@@ -99,6 +100,9 @@ class GobusterTool(BaseTool):
 
             for header_name, header_value in merged_headers.items():
                 cmd += ["-H", f"{header_name}: {header_value}"]
+
+        if data.insecure:
+            cmd.append("--no-tls-validation")
 
         if data.no_error:
             cmd.append("--no-error")
