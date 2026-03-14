@@ -47,9 +47,8 @@ class ArjunTool(BaseTool):
                 "-u", data.url,
                 "-m", data.method.upper(),
                 "-o", tmpfile_path,
-                "--oT", "json",
                 "-t", str(data.threads),
-                "--timeout", str(data.timeout),
+                "-T", str(data.timeout),
                 "-q",  # quiet mode
             ]
 
