@@ -1,23 +1,14 @@
-import os
-from pathlib import Path
-from typing import Optional, Literal
+from typing import Optional
 from pydantic import BaseModel, Field
 
 from tools.base import BaseTool, ToolResult
 from execution.runner import run_command
 
-# Wordlist is resolved from AUTOPEN_WORDLISTS_DIR env var (if set),
-# otherwise falls back to MCPServersAutoPen/wordlists/.
-_WORDLISTS_DIR = Path(os.environ.get(
-    "AUTOPEN_WORDLISTS_DIR",
-    Path(__file__).parent.parent / "wordlists",
-))
-GOBUSTER_WORDLIST = str(_WORDLISTS_DIR / "http-directories-wordlist.txt")
+GOBUSTER_WORDLIST = "/usr/share/dirb/wordlists/big.txt"
 
 
 class GobusterInput(BaseModel):
-    mode: Literal["dir", "dns", "vhost"] = Field(default="dir", description="Gobuster mode: dir, dns, or vhost")
-    target: str = Field(description="Target URL (for dir/vhost) or domain (for dns)")
+    target: str = Field(description="Target URL to brute-force (e.g. 'https://example.com')")
     extensions: Optional[str] = Field(default=None, description="File extensions to search for (e.g., 'php,html,txt')")
     status_codes: Optional[str] = Field(default=None, description="Status codes to match (e.g., '200,204,301')")
     exclude_status: Optional[str] = Field(default=None, description="Status codes to exclude (e.g., '404,403')")
@@ -49,7 +40,7 @@ class GobusterInput(BaseModel):
 class GobusterTool(BaseTool):
     name = "run_gobuster"
     description = (
-        "Run gobuster for directory/DNS/vhost brute-forcing. "
+        "Run gobuster directory brute-forcing (dir mode) against a target URL. "
         "Supports both unauthenticated and authenticated scanning via the 'headers' and 'cookies' fields. "
         "Use authenticated mode (with session cookies/JWT) to discover endpoints that return 200 "
         "instead of 401/403 when a valid session is present."
@@ -57,49 +48,33 @@ class GobusterTool(BaseTool):
     input_model = GobusterInput
 
     def run(self, data: GobusterInput) -> ToolResult:
-        if not Path(GOBUSTER_WORDLIST).exists():
-            return ToolResult(
-                success=False,
-                output=(
-                    f"Wordlist not found: {GOBUSTER_WORDLIST}\n"
-                    "Place http-directories-wordlist.txt in MCPServersAutoPen/wordlists/ "
-                    "or set the AUTOPEN_WORDLISTS_DIR environment variable."
-                ),
-            )
+        cmd = [
+            "gobuster", "dir",
+            "-u", data.target,
+            "-w", GOBUSTER_WORDLIST,
+            "-t", str(data.threads),
+            "--timeout", f"{data.timeout}s",
+        ]
 
-        cmd = ["gobuster", data.mode]
+        if data.extensions:
+            cmd += ["-x", data.extensions]
 
-        if data.mode == "dir":
-            cmd += ["-u", data.target]
-        elif data.mode == "dns":
-            cmd += ["-d", data.target]
-        elif data.mode == "vhost":
-            cmd += ["-u", data.target]
+        if data.status_codes:
+            cmd += ["-s", data.status_codes]
 
-        cmd += ["-w", GOBUSTER_WORDLIST]
-        cmd += ["-t", str(data.threads)]
-        cmd += ["--timeout", f"{data.timeout}s"]
+        if data.exclude_status:
+            cmd += ["-b", data.exclude_status]
 
-        if data.mode == "dir":
-            if data.extensions:
-                cmd += ["-x", data.extensions]
+        if data.follow_redirect:
+            cmd.append("-r")
 
-            if data.status_codes:
-                cmd += ["-s", data.status_codes]
+        # Inject authentication headers
+        merged_headers = dict(data.headers or {})
+        if data.cookies:
+            merged_headers["Cookie"] = data.cookies
 
-            if data.exclude_status:
-                cmd += ["-b", data.exclude_status]
-
-            if data.follow_redirect:
-                cmd.append("-r")
-
-            # Inject authentication headers
-            merged_headers = dict(data.headers or {})
-            if data.cookies:
-                merged_headers["Cookie"] = data.cookies
-
-            for header_name, header_value in merged_headers.items():
-                cmd += ["-H", f"{header_name}: {header_value}"]
+        for header_name, header_value in merged_headers.items():
+            cmd += ["-H", f"{header_name}: {header_value}"]
 
         if data.insecure:
             cmd.append("--no-tls-validation")
@@ -119,5 +94,4 @@ class GobusterTool(BaseTool):
         if not output:
             return ToolResult(success=False, output="gobuster returned no output")
 
-        # Raw output returned to agent. DB persistence via backend API.
         return ToolResult(success=True, output=output)
