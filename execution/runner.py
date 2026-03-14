@@ -1,100 +1,111 @@
 import os
 import subprocess
 import sys
+import threading
 import time
 from typing import Optional
 
-# Set MCP_DEBUG=1 (or pass --debug to server_http.py) to get full command
-# tracing: the exact command run, elapsed time, return code, and stdout/stderr.
-_DEBUG = os.environ.get("MCP_DEBUG", "0").strip() in ("1", "true", "yes")
+# Set MCP_LIVE_OUTPUT=0 to suppress live terminal streaming (default: on)
+_LIVE = os.environ.get("MCP_LIVE_OUTPUT", "1").strip() not in ("0", "false", "no")
 
-# Max chars of stdout/stderr printed in debug mode (keeps console readable)
-_DEBUG_OUTPUT_LIMIT = int(os.environ.get("MCP_DEBUG_OUTPUT_LIMIT", "2000"))
+# ANSI color codes
+_C_CMD    = "\033[96m"   # cyan   — command line
+_C_STDOUT = "\033[0m"    # reset  — stdout (normal)
+_C_STDERR = "\033[33m"   # yellow — stderr
+_C_META   = "\033[90m"   # grey   — exit/elapsed
+_C_WARN   = "\033[31m"   # red    — timeout/error
+_C_RESET  = "\033[0m"
 
 
-def _dbg(msg: str) -> None:
-    """Print a debug message with a [MCP-DBG] prefix to stdout."""
-    print(f"[MCP-DBG] {msg}", flush=True)
+def _print(msg: str) -> None:
+    print(msg, flush=True)
 
 
 def run_command(cmd: list[str], timeout: int = 120, stdin_input: Optional[str] = None):
     """
-    Centralized subprocess runner.
+    Centralized subprocess runner with live terminal output.
 
-    Args:
-        cmd: Command and arguments list.
-        timeout: Subprocess timeout in seconds.
-        stdin_input: If provided, pipe this string to the process stdin
-                     (e.g., for tools like waybackurls that read from stdin).
+    Prints every line of stdout/stderr to the MCP server terminal in real time
+    as the tool runs — exactly as if you had typed the command yourself.
 
-    When MCP_DEBUG=1 is set, prints the full command, elapsed time, return
-    code, and truncated stdout/stderr to stdout so you can see what tools
-    are actually doing in real time.
+    Disable live output with: MCP_LIVE_OUTPUT=0
     """
+    cmd_str = " ".join(str(c) for c in cmd)
+
+    if _LIVE:
+        _print(f"\n{_C_CMD}$ {cmd_str}{_C_RESET}")
+
     kwargs: dict = {
-        "capture_output": True,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
         "text": True,
-        "timeout": timeout,
         "shell": False,
     }
 
     if stdin_input is not None:
-        kwargs["input"] = stdin_input
+        kwargs["stdin"] = subprocess.PIPE
     else:
-        kwargs["stdin"] = subprocess.DEVNULL  # Prevent hanging on input
+        kwargs["stdin"] = subprocess.DEVNULL
 
-    # On Windows, prevent subprocess from inheriting console
+    # On Windows, prevent subprocess from opening its own console window
     if sys.platform == "win32":
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
-    if _DEBUG:
-        cmd_str = " ".join(str(c) for c in cmd)
-        _dbg(f"CMD  : {cmd_str}")
-        _dbg(f"TIMEOUT: {timeout}s")
+    stdout_lines: list[str] = []
+    stderr_lines: list[str] = []
+
+    def _read_stream(stream, lines: list[str], color: str) -> None:
+        """Read a stream line-by-line, print live, and accumulate."""
+        for raw_line in stream:
+            line = raw_line.rstrip("\n")
+            lines.append(line)
+            if _LIVE:
+                _print(f"{color}{line}{_C_RESET}")
 
     t0 = time.monotonic()
     try:
-        proc = subprocess.run(cmd, **kwargs)
-    except subprocess.TimeoutExpired as e:
-        elapsed = time.monotonic() - t0
-        if _DEBUG:
-            _dbg(f"TIMEOUT after {elapsed:.1f}s")
+        proc = subprocess.Popen(cmd, **kwargs)
+
+        t_out = threading.Thread(target=_read_stream,
+                                 args=(proc.stdout, stdout_lines, _C_STDOUT),
+                                 daemon=True)
+        t_err = threading.Thread(target=_read_stream,
+                                 args=(proc.stderr, stderr_lines, _C_STDERR),
+                                 daemon=True)
+        t_out.start()
+        t_err.start()
+
+        if stdin_input is not None:
+            try:
+                proc.stdin.write(stdin_input)
+                proc.stdin.close()
+            except BrokenPipeError:
+                pass
+
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            t_out.join(timeout=5)
+            t_err.join(timeout=5)
+            elapsed = time.monotonic() - t0
+            if _LIVE:
+                _print(f"{_C_WARN}[TIMEOUT after {elapsed:.1f}s — process killed]{_C_RESET}")
+            raise
+
+        t_out.join()
+        t_err.join()
+
+    except subprocess.TimeoutExpired:
         raise
+    except Exception as exc:
+        elapsed = time.monotonic() - t0
+        if _LIVE:
+            _print(f"{_C_WARN}[ERROR after {elapsed:.1f}s]: {exc}{_C_RESET}")
+        raise
+
     elapsed = time.monotonic() - t0
+    if _LIVE:
+        _print(f"{_C_META}[exit={proc.returncode}  elapsed={elapsed:.2f}s]{_C_RESET}")
 
-    if _DEBUG:
-        _dbg(f"DONE : exit={proc.returncode}  elapsed={elapsed:.2f}s")
-        if proc.stdout and proc.stdout.strip():
-            preview = proc.stdout[:_DEBUG_OUTPUT_LIMIT]
-            truncated = len(proc.stdout) > _DEBUG_OUTPUT_LIMIT
-            _dbg(f"STDOUT ({len(proc.stdout)} chars{', truncated' if truncated else ''}):\n{preview}")
-        else:
-            _dbg("STDOUT: (empty)")
-        if proc.stderr and proc.stderr.strip():
-            preview = proc.stderr[:_DEBUG_OUTPUT_LIMIT]
-            truncated = len(proc.stderr) > _DEBUG_OUTPUT_LIMIT
-            _dbg(f"STDERR ({len(proc.stderr)} chars{', truncated' if truncated else ''}):\n{preview}")
-        else:
-            _dbg("STDERR: (empty)")
-
-    return proc.returncode, proc.stdout, proc.stderr
-
-
-'''
-def run_command(
-    cmd: list[str],
-    timeout: int = 120,
-) -> tuple[int, str, str]:
-    """
-    Centralized subprocess runner.
-    """
-
-    proc = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-
-    return proc.returncode, proc.stdout, proc.stderr
-'''
+    return proc.returncode, "\n".join(stdout_lines), "\n".join(stderr_lines)

@@ -135,12 +135,18 @@ async def call_tool(
     if not tool:
         raise HTTPException(status_code=404, detail=f"Tool not found: {request.tool_name}")
 
-    if _DEBUG_MODE:
-        print(
-            f"[MCP] CALL  agent={request.agent_id}  tool={request.tool_name}  "
-            f"args={request.arguments}",
-            flush=True,
-        )
+    # Always print a clean invocation header so the terminal shows what's running
+    _sep = "─" * 60
+    args_lines = "\n".join(
+        f"  {k:<20} = {v}" for k, v in request.arguments.items()
+    )
+    print(
+        f"\n{_sep}\n"
+        f"\033[95m[MCP] {request.tool_name}\033[0m  ←  {request.agent_id}\n"
+        f"{args_lines}\n"
+        f"{_sep}",
+        flush=True,
+    )
 
     t0 = time.monotonic()
     try:
