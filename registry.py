@@ -6,6 +6,9 @@ from tools.gobuster import GobusterTool
 from tools.curl import CurlTool
 from tools.sqlmap import SqlmapTool
 from tools.waybackurls import WaybackurlsTool
+from tools.katana import KatanaTool
+from tools.paramspider import ParamSpiderTool
+from tools.arjun import ArjunTool
 
 TOOLS = [
     NmapTool(),
@@ -16,4 +19,7 @@ TOOLS = [
     CurlTool(),
     SqlmapTool(),
     WaybackurlsTool(),
+    KatanaTool(),
+    ParamSpiderTool(),
+    ArjunTool(),
 ]

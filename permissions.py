@@ -17,6 +17,9 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_httpx",
         "run_gobuster",
         "run_waybackurls",
+        "run_katana",
+        "run_paramspider",
+        "run_arjun",
     ],
 
     # Target profiling + account registration
@@ -117,11 +120,13 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
     # Escalation coordinator — analysis only, no MCP tools
     "escalation_agent": [],
 
-    # Authenticated re-recon — re-runs gobuster/httpx/curl with privileged session
+    # Authenticated re-recon — re-runs recon tools with privileged session
     "authenticated_recon_agent": [
         "run_curl",
         "run_gobuster",
         "run_httpx",
+        "run_katana",
+        "run_arjun",
     ],
 }
 
