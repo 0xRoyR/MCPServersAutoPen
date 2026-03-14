@@ -12,6 +12,14 @@ class GobusterInput(BaseModel):
     extensions: Optional[str] = Field(default=None, description="File extensions to search for (e.g., 'php,html,txt')")
     status_codes: Optional[str] = Field(default=None, description="Status codes to match (e.g., '200,204,301')")
     exclude_status: Optional[str] = Field(default=None, description="Status codes to exclude (e.g., '404,403')")
+    exclude_length: Optional[int] = Field(
+        default=None,
+        description=(
+            "Exclude responses with this exact body length. "
+            "Use when the server returns 200 for every request (wildcard responses). "
+            "Gobuster will report the required value in its error output."
+        ),
+    )
     threads: int = Field(default=30, description="Number of concurrent threads")
     timeout: int = Field(default=10, description="HTTP timeout in seconds")
     max_time: int = Field(default=300, description="Maximum total execution time in seconds")
@@ -67,6 +75,9 @@ class GobusterTool(BaseTool):
 
         if data.follow_redirect:
             cmd.append("-r")
+
+        if data.exclude_length is not None:
+            cmd += ["--exclude-length", str(data.exclude_length)]
 
         # Inject authentication headers
         merged_headers = dict(data.headers or {})
