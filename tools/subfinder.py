@@ -6,6 +6,8 @@ from execution.runner import run_command
 
 
 class SubfinderInput(BaseModel):
+    scan_uuid: Optional[str] = Field(default=None, description="Scan UUID — required for DB persistence")
+    target_uuid: Optional[str] = Field(default=None, description="Target UUID — required for DB persistence")
     domain: Optional[str] = Field(default=None, description="Single domain to enumerate")
     domains_file: Optional[str] = Field(default=None, description="File containing list of domains")
     recursive: bool = Field(default=False, description="Use recursive enumeration")
@@ -19,7 +21,11 @@ class SubfinderInput(BaseModel):
 
 class SubfinderTool(BaseTool):
     name = "run_subfinder"
-    description = "Run subfinder for subdomain enumeration"
+    description = (
+        "Run subfinder for subdomain enumeration. "
+        "When scan_uuid and target_uuid are provided, discovered subdomains are saved directly "
+        "to the database and a summary is returned instead of raw output."
+    )
     input_model = SubfinderInput
 
     def run(self, data: SubfinderInput) -> ToolResult:
@@ -43,7 +49,6 @@ class SubfinderTool(BaseTool):
         if data.silent:
             cmd.append("-silent")
 
-        # Add timeout for each source
         cmd += ["-timeout", str(data.timeout)]
 
         if data.resolvers_file:
@@ -53,7 +58,6 @@ class SubfinderTool(BaseTool):
             cmd += ["-sources", ",".join(data.sources)]
 
         try:
-            # Use max_time + buffer for subprocess timeout
             code, out, err = run_command(cmd, timeout=data.max_time + 10)
         except Exception as e:
             return ToolResult(success=False, output=f"Error: {str(e)}")
@@ -61,5 +65,31 @@ class SubfinderTool(BaseTool):
         if code != 0:
             return ToolResult(success=False, output=err)
 
-        # Raw output returned to agent. DB persistence via backend API.
+        # If scan_uuid + target_uuid provided, persist to DB
+        if data.scan_uuid and data.target_uuid and out:
+            try:
+                from db import get_repo
+                repo = get_repo()
+                root_domain = data.domain or "unknown"
+                lines = [l.strip() for l in out.splitlines() if l.strip()]
+                saved = 0
+                for subdomain in lines:
+                    result = repo.upsert_subdomain(
+                        target_uuid=data.target_uuid,
+                        scan_uuid=data.scan_uuid,
+                        domain=root_domain,
+                        subdomain=subdomain,
+                        source="subfinder",
+                    )
+                    if result:
+                        saved += 1
+                return ToolResult(
+                    success=True,
+                    output=f"subfinder complete. Found {len(lines)} subdomains, saved {saved} new to DB.",
+                    db_ref={"table": "subdomains", "rows_saved": saved, "total_found": len(lines)},
+                )
+            except Exception as e:
+                # DB save failed — fall through to return raw output
+                return ToolResult(success=True, output=f"subfinder complete but DB save failed: {e}\n\n{out}")
+
         return ToolResult(success=True, output=out)

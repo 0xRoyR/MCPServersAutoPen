@@ -117,7 +117,7 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_curl",
     ],
 
-    # Master agent — adaptive recon + attack planning
+    # Master agent — adaptive recon + attack planning + DB query tools
     "master_agent": [
         "run_whois",
         "run_subfinder",
@@ -129,6 +129,20 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_paramspider",
         "run_arjun",
         "run_curl",
+        "get_attack_surface",
+        "get_endpoints",
+        "get_http_services",
+        "get_subdomains",
+    ],
+
+    # Master web agent — query tools for reading recon data
+    "master_web_agent": [
+        "run_curl",
+        "run_httpx",
+        "get_attack_surface",
+        "get_endpoints",
+        "get_http_services",
+        "get_subdomains",
     ],
 
     # Escalation coordinator — analysis only, no MCP tools

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 class ToolResult(BaseModel):
     success: bool
     output: str
+    db_ref: dict | None = None  # Set when tool persists data to DB: {"table": ..., "rows_saved": ...}
 
 
 class BaseTool(ABC):

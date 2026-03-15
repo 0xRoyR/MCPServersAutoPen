@@ -9,6 +9,12 @@ from tools.waybackurls import WaybackurlsTool
 from tools.katana import KatanaTool
 from tools.paramspider import ParamSpiderTool
 from tools.arjun import ArjunTool
+from tools.query_recon import (
+    GetAttackSurfaceTool,
+    GetEndpointsTool,
+    GetHttpServicesTool,
+    GetSubdomainsTool,
+)
 
 TOOLS = [
     NmapTool(),
@@ -22,4 +28,8 @@ TOOLS = [
     KatanaTool(),
     ParamSpiderTool(),
     ArjunTool(),
+    GetAttackSurfaceTool(),
+    GetEndpointsTool(),
+    GetHttpServicesTool(),
+    GetSubdomainsTool(),
 ]
