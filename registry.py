@@ -15,6 +15,7 @@ from tools.query_recon import (
     GetHttpServicesTool,
     GetSubdomainsTool,
 )
+from tools.jwt import JwtTool
 
 TOOLS = [
     NmapTool(),
@@ -32,4 +33,5 @@ TOOLS = [
     GetEndpointsTool(),
     GetHttpServicesTool(),
     GetSubdomainsTool(),
+    JwtTool(),
 ]

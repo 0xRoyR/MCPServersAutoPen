@@ -126,6 +126,24 @@ SCHEMA = {
         "description": "Stores directory/file discovery results from gobuster",
     },
 
+    # JWT results - JWT decoding and attacking results
+    "jwt_results": {
+        "columns": {
+            "uuid": "TEXT PRIMARY KEY",
+            "target_uuid": "TEXT NOT NULL",  # FK to targets table
+            "host": "TEXT NOT NULL",  # Original target/app where token was found
+            "token": "TEXT NOT NULL",  # The original JWT string
+            "algorithm": "TEXT",  # Token algorithm (e.g., HS256, RS256, none)
+            "finding_type": "TEXT",  # info, cracked_secret, exploit_success
+            "cracked_secret": "TEXT",  # Discovered secret via brute-force
+            "tampered_token": "TEXT",  # Generated forged token via exploit
+            "scanned_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        },
+        "indexes": ["target_uuid", "host", "finding_type"],
+        "foreign_keys": [("target_uuid", "targets", "uuid")],
+        "description": "Stores JWT analysis, cracking, and exploitation results",
+    },
+
     # Findings - security findings from the assessment
     "findings": {
         "columns": {
