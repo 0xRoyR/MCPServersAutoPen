@@ -117,7 +117,28 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_curl",
     ],
 
-    # Master agent — adaptive recon + attack planning + DB query tools
+    # Strategy agent — pure analysis + recon planning, delegates execution to recon_agent
+    "strategy_agent": [
+        "run_curl",
+        "get_attack_surface",
+        "get_endpoints",
+        "get_http_services",
+        "get_subdomains",
+    ],
+
+    # Queue agent — URL queue lifecycle + per-URL vector planning
+    "queue_agent": [
+        "run_curl",
+        "get_attack_surface",
+        "get_endpoints",
+        "get_http_services",
+        "get_subdomains",
+    ],
+
+    # Review agent — post-round review + escalation decisions (analysis only)
+    "review_agent": [],
+
+    # Master agent — legacy, superseded by strategy_agent (kept for backwards compat)
     "master_agent": [
         "run_whois",
         "run_subfinder",
@@ -135,7 +156,7 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "get_subdomains",
     ],
 
-    # Master web agent — query tools for reading recon data
+    # Master web agent — legacy, superseded by queue_agent + review_agent
     "master_web_agent": [
         "run_curl",
         "run_httpx",
@@ -144,9 +165,6 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "get_http_services",
         "get_subdomains",
     ],
-
-    # Escalation coordinator — analysis only, no MCP tools
-    "escalation_agent": [],
 
     # Authenticated re-recon — re-runs recon tools with privileged session
     "authenticated_recon_agent": [
@@ -186,5 +204,4 @@ def is_tool_allowed(agent_id: str, tool_name: str, all_tool_names: list[str]) ->
     if allowed is None:
         return False  # Unknown agent — deny
 
-    # Escalation agent has no tools but is a known agent — return False for any tool
     return tool_name in allowed

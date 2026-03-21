@@ -143,10 +143,10 @@ class GobusterTool(BaseTool):
                 http_services = repo.get_http_services(data.target_uuid)
                 if not http_services:
                     return ToolResult(success=False, output="No HTTP services found in DB for this target. Run httpx first.")
-                # Only scan services with status 200 (or no status — means httpx didn't filter)
-                targets = [s["url"] for s in http_services if s.get("status_code") in (200, None)]
+                # Only scan services with a 2xx status code
+                targets = [s["url"] for s in http_services if s.get("status_code") and 200 <= s["status_code"] <= 299]
                 if not targets:
-                    targets = [s["url"] for s in http_services[:5]]
+                    return ToolResult(success=False, output="No HTTP services with 2xx status found in DB. Nothing to scan with gobuster.")
             except Exception as e:
                 return ToolResult(success=False, output=f"Failed to read http_services from DB: {e}")
         elif data.target:
