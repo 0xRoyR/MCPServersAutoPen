@@ -38,7 +38,13 @@ def run_command(cmd: list[str], timeout: int = 120, stdin_input: Optional[str] =
     cmd_str = " ".join(str(c) for c in cmd)
 
     if _LIVE:
-        _print(f"\n{_C_CMD}$ {cmd_str}{_C_RESET}")
+        if stdin_input is not None:
+            # Show piped input inline so the full invocation is visible in the terminal,
+            # e.g. `$ echo 'example.com' | waybackurls` instead of just `$ waybackurls`
+            stdin_preview = stdin_input.strip()[:120].replace("\n", " ")
+            _print(f"\n{_C_CMD}$ echo '{stdin_preview}' | {cmd_str}{_C_RESET}")
+        else:
+            _print(f"\n{_C_CMD}$ {cmd_str}{_C_RESET}")
 
     kwargs: dict = {
         "stdout": subprocess.PIPE,

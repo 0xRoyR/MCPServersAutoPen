@@ -99,15 +99,19 @@ class WaybackurlsTool(BaseTool):
                 pass
 
         all_urls: list[str] = []
+        last_error: str | None = None
         for domain in domains_to_query:
             try:
                 code, out, err = _run_waybackurls(domain, data)
             except Exception as e:
+                last_error = str(e)
                 continue
             if out and out.strip():
                 all_urls.extend(out.strip().splitlines())
 
         if not all_urls:
+            if last_error:
+                return ToolResult(success=False, output=f"waybackurls failed: {last_error}")
             return ToolResult(success=True, output="No historical URLs found.")
 
         # Deduplicate (anew-style)
