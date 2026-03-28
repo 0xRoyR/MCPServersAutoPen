@@ -47,6 +47,8 @@ from dotenv import load_dotenv
 _here = Path(__file__).parent
 load_dotenv(_here / ".env") or load_dotenv(_here.parent / "AutoPenAgents" / ".env")
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -54,15 +56,25 @@ import uvicorn
 
 from registry import TOOLS
 from permissions import is_tool_allowed, get_allowed_tools, SUPERUSER_AGENT_ID
+from db.connection import _check_db_enabled
 
 # Build tool lookup dict
 TOOLS_BY_NAME = {tool.name: tool for tool in TOOLS}
 ALL_TOOL_NAMES = list(TOOLS_BY_NAME.keys())
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Eagerly check MySQL connectivity so the result prints at startup
+    _check_db_enabled()
+    yield
+
+
 app = FastAPI(
     title="AutoPen MCP HTTP Server",
     description="HTTP wrapper around the MCP security tools with per-agent permission enforcement",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 INTERNAL_KEY = os.environ.get("INTERNAL_API_KEY", "change-me-internal-key")
