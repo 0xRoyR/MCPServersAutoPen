@@ -36,6 +36,10 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
     ],
 
     # SQL Injection pipeline
+    "sqli_agent": [
+        "run_curl",
+        "run_sqlmap",
+    ],
     "sqli_recon_agent": [
         "run_curl",
         "run_httpx",
