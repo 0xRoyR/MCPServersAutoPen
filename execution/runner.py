@@ -1,4 +1,5 @@
 import os
+import shlex
 import subprocess
 import sys
 import threading
@@ -35,7 +36,7 @@ def run_command(cmd: list[str], timeout: int = 120, stdin_input: Optional[str] =
 
     Disable live output with: MCP_LIVE_OUTPUT=0
     """
-    cmd_str = " ".join(str(c) for c in cmd)
+    cmd_str = shlex.join(str(c) for c in cmd)
 
     if _LIVE:
         if stdin_input is not None:

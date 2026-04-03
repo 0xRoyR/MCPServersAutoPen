@@ -59,10 +59,13 @@ def _parse_gobuster_line(line: str):
     if not line or line.startswith("=") or line.startswith("/usr") or "Progress:" in line:
         return None
 
-    path_match = re.match(r'^(/\S*)', line)
+    # Match paths with or without leading slash (e.g. "/admin" or "admin")
+    path_match = re.match(r'^(/?[\w.~@:%-]+(?:/[\w.~@:%-]*)*)', line)
     if not path_match:
         return None
     path = path_match.group(1)
+    if not path.startswith("/"):
+        path = "/" + path
 
     status_match = re.search(r'\(Status:\s*(\d+)\)', line)
     status_code = int(status_match.group(1)) if status_match else None
@@ -205,9 +208,11 @@ class GobusterTool(BaseTool):
         combined_output = "\n\n".join(all_output)
 
         if db_mode:
+            # Include raw output so upstream agents can parse discovered paths
+            summary = f"gobuster complete. Scanned {len(targets)} targets, found {total_found} endpoints, saved {total_saved} new to DB."
             return ToolResult(
                 success=True,
-                output=f"gobuster complete. Scanned {len(targets)} targets, found {total_found} endpoints, saved {total_saved} new to DB.",
+                output=f"{summary}\n\n{combined_output}" if combined_output else summary,
                 db_ref={"table": "endpoints", "rows_saved": total_saved, "total_found": total_found},
             )
 

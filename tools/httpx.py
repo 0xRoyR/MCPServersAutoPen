@@ -10,6 +10,7 @@ class HttpxInput(BaseModel):
     scan_uuid: Optional[str] = Field(default=None, description="Scan UUID — required for DB mode")
     target_uuid: Optional[str] = Field(default=None, description="Target UUID — required for DB mode")
     target: Optional[str] = Field(default=None, description="Single target URL or host. If omitted and scan_uuid+target_uuid provided, reads subdomains from DB automatically.")
+    targets_list: Optional[list[str]] = Field(default=None, description="List of target URLs to probe (e.g., ['https://example.com', 'http://example.com:8080']). All probed in a single httpx invocation.")
     targets_file: Optional[str] = Field(default=None, description="File containing list of targets")
     ports: Optional[str] = Field(default=None, description="Ports to probe (e.g., '80,443,8080')")
     path: Optional[str] = Field(default=None, description="Path to append to URLs")
@@ -54,7 +55,9 @@ class HttpxTool(BaseTool):
         targets_to_probe = []
         db_mode = bool(data.scan_uuid and data.target_uuid)
 
-        if db_mode and not data.target and not data.targets_file:
+        if data.targets_list:
+            targets_to_probe = data.targets_list
+        elif db_mode and not data.target and not data.targets_file:
             try:
                 from db import get_repo
                 repo = get_repo()
@@ -67,7 +70,7 @@ class HttpxTool(BaseTool):
         elif data.target:
             targets_to_probe = [data.target]
         elif not data.targets_file:
-            return ToolResult(success=False, output="Error: either 'target', 'targets_file', or scan_uuid+target_uuid must be provided")
+            return ToolResult(success=False, output="Error: either 'target', 'targets_list', 'targets_file', or scan_uuid+target_uuid must be provided")
 
         # Build command
         cmd = ["httpx", "-json"]
