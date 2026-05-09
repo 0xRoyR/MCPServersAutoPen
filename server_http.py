@@ -56,6 +56,8 @@ import uvicorn
 
 from registry import TOOLS
 from permissions import is_tool_allowed, get_allowed_tools, SUPERUSER_AGENT_ID
+from risk_classification import classify, requires_approval, fingerprint
+from approval_tokens import verify as verify_approval_token
 from db.connection import _check_db_enabled
 
 # Build tool lookup dict
@@ -127,6 +129,10 @@ class ToolCallRequest(BaseModel):
     agent_id: str
     tool_name: str
     arguments: dict[str, Any] = {}
+    # HITL: attached by the agent when re-sending a previously approved
+    # class C / D action. Absent on the first attempt.
+    approval_token: str | None = None
+    scan_uuid: str | None = None
 
 
 @app.post("/tools/call")
@@ -146,6 +152,38 @@ async def call_tool(
     tool = TOOLS_BY_NAME.get(request.tool_name)
     if not tool:
         raise HTTPException(status_code=404, detail=f"Tool not found: {request.tool_name}")
+
+    # ── HITL: classify risk and block C / D actions without approval ─────────
+    risk_class = classify(request.tool_name, request.arguments)
+    call_fingerprint = fingerprint(request.tool_name, request.arguments)
+
+    if requires_approval(risk_class):
+        ok, reason = (False, "token_missing")
+        if request.approval_token:
+            ok, reason = verify_approval_token(request.approval_token, call_fingerprint)
+
+        if not ok:
+            print(
+                f"\033[93m[MCP] HITL gate: {request.tool_name} "
+                f"risk={risk_class} agent={request.agent_id} reason={reason}\033[0m",
+                flush=True,
+            )
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": False,
+                    "output": f"approval_required: {reason}",
+                    "tool": request.tool_name,
+                    "agent_id": request.agent_id,
+                    "hitl": {
+                        "approval_required": True,
+                        "risk_class": risk_class,
+                        "fingerprint": call_fingerprint,
+                        "reason": reason,
+                        "scan_uuid": request.scan_uuid,
+                    },
+                },
+            )
 
     # Always print a clean invocation header so the terminal shows what's running
     _sep = "─" * 60
