@@ -14,6 +14,9 @@ class WaybackurlsInput(BaseModel):
     date: Optional[str] = Field(default=None, description="Filter URLs to those before this date (YYYYMMDD)")
     get_versions: bool = Field(default=False, description="List URLs and the dates they appeared (slow)")
     max_time: int = Field(default=120, description="Maximum execution time in seconds")
+    # Scope plumbing (injected by BaseAgent.call_mcp; ignored if absent)
+    mcp_scopes: Optional[list[dict]] = Field(default=None, description="Scope rules for filtering DB writes")
+    mcp_default_in_out: str = Field(default="in", description="Default in/out for assets matching no rule")
 
 
 def _run_waybackurls(domain: str, data: WaybackurlsInput) -> tuple[int, str, str]:
@@ -123,13 +126,18 @@ class WaybackurlsTool(BaseTool):
         # Persist new endpoints + parameters to DB
         try:
             from db import get_repo
+            from scope_filter import is_in_scope
             repo = get_repo()
             endpoints_saved = 0
             params_saved = 0
+            skipped_oos = 0
 
             for url in new_urls:
                 url = url.strip()
                 if not url:
+                    continue
+                if not is_in_scope(url, data.mcp_scopes, data.mcp_default_in_out):
+                    skipped_oos += 1
                     continue
                 try:
                     parsed = urlparse(url)
@@ -166,19 +174,23 @@ class WaybackurlsTool(BaseTool):
                 except Exception:
                     continue
 
+            msg = (
+                f"waybackurls complete. Found {len(all_urls)} total URLs, "
+                f"{len(new_urls)} new after deduplication. "
+                f"Saved {endpoints_saved} endpoints and {params_saved} parameters to DB."
+            )
+            if skipped_oos:
+                msg += f" Skipped {skipped_oos} out-of-scope."
             return ToolResult(
                 success=True,
-                output=(
-                    f"waybackurls complete. Found {len(all_urls)} total URLs, "
-                    f"{len(new_urls)} new after deduplication. "
-                    f"Saved {endpoints_saved} endpoints and {params_saved} parameters to DB."
-                ),
+                output=msg,
                 db_ref={
                     "table": "endpoints+endpoint_parameters",
                     "endpoints_saved": endpoints_saved,
                     "params_saved": params_saved,
                     "total_found": len(all_urls),
                     "new_after_dedup": len(new_urls),
+                    "scope_skipped": skipped_oos,
                 },
             )
         except Exception as e:

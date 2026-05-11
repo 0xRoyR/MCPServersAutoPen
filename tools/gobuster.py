@@ -46,6 +46,9 @@ class GobusterInput(BaseModel):
             "Convenience field — equivalent to setting Cookie in headers."
         ),
     )
+    # Scope plumbing (injected by BaseAgent.call_mcp; ignored if absent)
+    mcp_scopes: Optional[list[dict]] = Field(default=None, description="Scope rules for filtering DB writes")
+    mcp_default_in_out: str = Field(default="in", description="Default in/out for assets matching no rule")
 
 
 def _parse_gobuster_line(line: str):
@@ -160,6 +163,7 @@ class GobusterTool(BaseTool):
         all_output = []
         total_saved = 0
         total_found = 0
+        total_oos = 0
 
         for target_url in targets:
             try:
@@ -177,6 +181,7 @@ class GobusterTool(BaseTool):
             if db_mode:
                 try:
                     from db import get_repo
+                    from scope_filter import is_in_scope
                     repo = get_repo()
                     parsed = urlparse(target_url)
                     host = parsed.netloc or parsed.path
@@ -188,6 +193,9 @@ class GobusterTool(BaseTool):
                         path, status_code, content_length, redirect_url = parsed_line
                         full_url = target_url.rstrip("/") + path
                         total_found += 1
+                        if not is_in_scope(full_url, data.mcp_scopes, data.mcp_default_in_out):
+                            total_oos += 1
+                            continue
                         result = repo.upsert_endpoint(
                             target_uuid=data.target_uuid,
                             scan_uuid=data.scan_uuid,
@@ -210,10 +218,12 @@ class GobusterTool(BaseTool):
         if db_mode:
             # Include raw output so upstream agents can parse discovered paths
             summary = f"gobuster complete. Scanned {len(targets)} targets, found {total_found} endpoints, saved {total_saved} new to DB."
+            if total_oos:
+                summary += f" Skipped {total_oos} out-of-scope."
             return ToolResult(
                 success=True,
                 output=f"{summary}\n\n{combined_output}" if combined_output else summary,
-                db_ref={"table": "endpoints", "rows_saved": total_saved, "total_found": total_found},
+                db_ref={"table": "endpoints", "rows_saved": total_saved, "total_found": total_found, "scope_skipped": total_oos},
             )
 
         return ToolResult(success=True, output=combined_output if combined_output else "gobuster returned no output")

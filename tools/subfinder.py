@@ -17,6 +17,9 @@ class SubfinderInput(BaseModel):
     max_time: int = Field(default=180, description="Maximum total execution time in seconds")
     resolvers_file: Optional[str] = Field(default=None, description="File containing resolvers")
     sources: Optional[list[str]] = Field(default=None, description="Specific sources to use")
+    # Scope plumbing (injected by BaseAgent.call_mcp; ignored if absent)
+    mcp_scopes: Optional[list[dict]] = Field(default=None, description="Scope rules for filtering DB writes")
+    mcp_default_in_out: str = Field(default="in", description="Default in/out for assets matching no rule")
 
 
 class SubfinderTool(BaseTool):
@@ -69,11 +72,16 @@ class SubfinderTool(BaseTool):
         if data.scan_uuid and data.target_uuid and out:
             try:
                 from db import get_repo
+                from scope_filter import is_in_scope
                 repo = get_repo()
                 root_domain = data.domain or "unknown"
                 lines = [l.strip() for l in out.splitlines() if l.strip()]
                 saved = 0
+                skipped_oos = 0
                 for subdomain in lines:
+                    if not is_in_scope(subdomain, data.mcp_scopes, data.mcp_default_in_out):
+                        skipped_oos += 1
+                        continue
                     result = repo.upsert_subdomain(
                         target_uuid=data.target_uuid,
                         scan_uuid=data.scan_uuid,
@@ -83,10 +91,13 @@ class SubfinderTool(BaseTool):
                     )
                     if result:
                         saved += 1
+                msg = f"subfinder complete. Found {len(lines)} subdomains, saved {saved} new to DB."
+                if skipped_oos:
+                    msg += f" Skipped {skipped_oos} out-of-scope."
                 return ToolResult(
                     success=True,
-                    output=f"subfinder complete. Found {len(lines)} subdomains, saved {saved} new to DB.",
-                    db_ref={"table": "subdomains", "rows_saved": saved, "total_found": len(lines)},
+                    output=msg,
+                    db_ref={"table": "subdomains", "rows_saved": saved, "total_found": len(lines), "scope_skipped": skipped_oos},
                 )
             except Exception as e:
                 # DB save failed — fall through to return raw output

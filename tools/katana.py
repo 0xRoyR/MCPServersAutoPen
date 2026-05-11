@@ -32,6 +32,9 @@ class KatanaInput(BaseModel):
             "Convenience field — merged into headers as Cookie."
         ),
     )
+    # Scope plumbing (injected by BaseAgent.call_mcp; ignored if absent)
+    mcp_scopes: Optional[list[dict]] = Field(default=None, description="Scope rules for filtering DB writes")
+    mcp_default_in_out: str = Field(default="in", description="Default in/out for assets matching no rule")
 
 
 def _run_katana_on_target(target_url: str, data: KatanaInput) -> str:
@@ -143,13 +146,18 @@ class KatanaTool(BaseTool):
         # Persist to DB
         try:
             from db import get_repo
+            from scope_filter import is_in_scope
             repo = get_repo()
             endpoints_saved = 0
             params_saved = 0
+            skipped_oos = 0
 
             for url in new_urls:
                 url = url.strip()
                 if not url:
+                    continue
+                if not is_in_scope(url, data.mcp_scopes, data.mcp_default_in_out):
+                    skipped_oos += 1
                     continue
                 try:
                     parsed = urlparse(url)
@@ -184,19 +192,23 @@ class KatanaTool(BaseTool):
                 except Exception:
                     continue
 
+            msg = (
+                f"katana complete. Crawled {len(targets)} services, discovered {len(all_discovered)} URLs, "
+                f"{len(new_urls)} new after deduplication. "
+                f"Saved {endpoints_saved} endpoints and {params_saved} parameters to DB."
+            )
+            if skipped_oos:
+                msg += f" Skipped {skipped_oos} out-of-scope."
             return ToolResult(
                 success=True,
-                output=(
-                    f"katana complete. Crawled {len(targets)} services, discovered {len(all_discovered)} URLs, "
-                    f"{len(new_urls)} new after deduplication. "
-                    f"Saved {endpoints_saved} endpoints and {params_saved} parameters to DB."
-                ),
+                output=msg,
                 db_ref={
                     "table": "endpoints+endpoint_parameters",
                     "endpoints_saved": endpoints_saved,
                     "params_saved": params_saved,
                     "total_discovered": len(all_discovered),
                     "new_after_dedup": len(new_urls),
+                    "scope_skipped": skipped_oos,
                 },
             )
         except Exception as e:

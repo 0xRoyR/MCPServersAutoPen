@@ -37,6 +37,9 @@ class HttpxInput(BaseModel):
             "Convenience field — equivalent to setting Cookie in headers."
         ),
     )
+    # Scope plumbing (injected by BaseAgent.call_mcp; ignored if absent)
+    mcp_scopes: Optional[list[dict]] = Field(default=None, description="Scope rules for filtering DB writes")
+    mcp_default_in_out: str = Field(default="in", description="Default in/out for assets matching no rule")
 
 
 class HttpxTool(BaseTool):
@@ -134,8 +137,10 @@ class HttpxTool(BaseTool):
         if db_mode and output:
             try:
                 from db import get_repo
+                from scope_filter import is_in_scope
                 repo = get_repo()
                 saved = 0
+                skipped_oos = 0
                 for line in output.splitlines():
                     line = line.strip()
                     if not line:
@@ -158,6 +163,10 @@ class HttpxTool(BaseTool):
                     if not url:
                         continue
 
+                    if not is_in_scope(url, data.mcp_scopes, data.mcp_default_in_out):
+                        skipped_oos += 1
+                        continue
+
                     result = repo.upsert_http_service(
                         target_uuid=data.target_uuid,
                         scan_uuid=data.scan_uuid,
@@ -174,10 +183,13 @@ class HttpxTool(BaseTool):
                     if result:
                         saved += 1
 
+                msg = f"httpx complete. Probed {len(targets_to_probe)} targets, saved {saved} live HTTP services to DB."
+                if skipped_oos:
+                    msg += f" Skipped {skipped_oos} out-of-scope."
                 return ToolResult(
                     success=True,
-                    output=f"httpx complete. Probed {len(targets_to_probe)} targets, saved {saved} live HTTP services to DB.",
-                    db_ref={"table": "http_services", "rows_saved": saved},
+                    output=msg,
+                    db_ref={"table": "http_services", "rows_saved": saved, "scope_skipped": skipped_oos},
                 )
             except Exception as e:
                 return ToolResult(success=True, output=f"httpx complete but DB save failed: {e}\n\n{output}")
