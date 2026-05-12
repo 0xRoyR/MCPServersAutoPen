@@ -49,6 +49,12 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_sqlmap",
     ],
 
+    # NoSQL Injection (single-phase)
+    "nosqli_agent": [
+        "run_curl",
+        "run_nosqlmap",
+    ],
+
     # XSS pipeline
     "xss_recon_agent": [
         "run_curl",

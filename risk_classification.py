@@ -48,6 +48,7 @@ _DEFAULT_TOOL_CLASS: dict[str, str] = {
 
     # High-signal exploitation tooling — default C, escalates to D on mutation
     "run_sqlmap":       "C",
+    "run_nosqlmap":     "C",
 }
 
 

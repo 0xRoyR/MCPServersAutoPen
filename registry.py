@@ -5,6 +5,7 @@ from tools.httpx import HttpxTool
 from tools.gobuster import GobusterTool
 from tools.curl import CurlTool
 from tools.sqlmap import SqlmapTool
+from tools.nosqlmap import NosqlmapTool
 from tools.waybackurls import WaybackurlsTool
 from tools.katana import KatanaTool
 from tools.paramspider import ParamSpiderTool
@@ -24,6 +25,7 @@ TOOLS = [
     GobusterTool(),
     CurlTool(),
     SqlmapTool(),
+    NosqlmapTool(),
     WaybackurlsTool(),
     KatanaTool(),
     ParamSpiderTool(),
