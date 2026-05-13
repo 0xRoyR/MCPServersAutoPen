@@ -20,6 +20,7 @@ See docs/risk_classes.md for the full matrix.
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
@@ -101,9 +102,31 @@ def classify(tool_name: str, arguments: dict[str, Any]) -> str:
     return base
 
 
+def _auto_approved_classes() -> frozenset[str]:
+    """Risk classes the operator has opted out of HITL for, via env var.
+
+    Set ``AUTOPEN_AUTO_APPROVE_CLASSES`` to a comma-separated list (e.g. "C"
+    or "C,D") to bypass the human approval gate for those classes. Intended
+    for unattended scans against authorized targets where stopping for
+    interactive approval is impractical.
+
+    SECURITY NOTE: class D covers destructive sqlmap flags (--os-shell,
+    --file-write, etc.). Auto-approving D is supported but should be used
+    only on disposable lab targets. The default is empty — full HITL enforced.
+    """
+    raw = os.environ.get("AUTOPEN_AUTO_APPROVE_CLASSES", "")
+    if not raw.strip():
+        return frozenset()
+    return frozenset(
+        part.strip().upper() for part in raw.split(",") if part.strip()
+    )
+
+
 def requires_approval(risk_class: str) -> bool:
-    """C and D always need a human approval before execution."""
-    return risk_class in ("C", "D")
+    """C and D need human approval unless the operator opted out via env var."""
+    if risk_class not in ("C", "D"):
+        return False
+    return risk_class not in _auto_approved_classes()
 
 
 # ── Internal: per-tool classifiers ────────────────────────────────────────────
