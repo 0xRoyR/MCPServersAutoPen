@@ -56,7 +56,12 @@ import uvicorn
 
 from registry import TOOLS
 from permissions import is_tool_allowed, get_allowed_tools, SUPERUSER_AGENT_ID
-from risk_classification import classify, requires_approval, fingerprint
+from risk_classification import (
+    classify,
+    requires_approval,
+    fingerprint,
+    _auto_approved_classes,
+)
 from approval_tokens import verify as verify_approval_token
 from db.connection import _check_db_enabled
 
@@ -69,6 +74,15 @@ ALL_TOOL_NAMES = list(TOOLS_BY_NAME.keys())
 async def lifespan(app: FastAPI):
     # Eagerly check MySQL connectivity so the result prints at startup
     _check_db_enabled()
+    # Surface auto-approve config at startup so the operator can see whether
+    # HITL is being bypassed before any sensitive tool runs.
+    auto = _auto_approved_classes()
+    if auto:
+        print(
+            f"\033[93m[MCP] AUTOPEN_AUTO_APPROVE_CLASSES is set — "
+            f"classes {sorted(auto)} will bypass the HITL gate.\033[0m",
+            flush=True,
+        )
     yield
 
 
@@ -156,6 +170,16 @@ async def call_tool(
     # ── HITL: classify risk and block C / D actions without approval ─────────
     risk_class = classify(request.tool_name, request.arguments)
     call_fingerprint = fingerprint(request.tool_name, request.arguments)
+
+    # If the operator opted out of HITL for this risk class via env var, log
+    # the bypass clearly. requires_approval() will return False below.
+    if risk_class in ("C", "D") and risk_class in _auto_approved_classes():
+        print(
+            f"\033[93m[MCP] AUTO-APPROVE: {request.tool_name} "
+            f"risk={risk_class} agent={request.agent_id} "
+            f"(AUTOPEN_AUTO_APPROVE_CLASSES bypass)\033[0m",
+            flush=True,
+        )
 
     if requires_approval(risk_class):
         ok, reason = (False, "token_missing")
