@@ -9,6 +9,7 @@ from tools.waybackurls import WaybackurlsTool
 from tools.katana import KatanaTool
 from tools.paramspider import ParamSpiderTool
 from tools.arjun import ArjunTool
+from tools.nosqlmap import NosqlmapTool
 from tools.query_recon import (
     GetAttackSurfaceTool,
     GetEndpointsTool,
@@ -24,6 +25,7 @@ TOOLS = [
     GobusterTool(),
     CurlTool(),
     SqlmapTool(),
+    NosqlmapTool(),
     WaybackurlsTool(),
     KatanaTool(),
     ParamSpiderTool(),
