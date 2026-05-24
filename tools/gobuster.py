@@ -1,3 +1,4 @@
+import os
 import re
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -6,7 +7,9 @@ from urllib.parse import urlparse
 from tools.base import BaseTool, ToolResult
 from execution.runner import run_command
 
-GOBUSTER_WORDLIST = "/usr/share/dirb/wordlists/small.txt"
+# Resolve bundled wordlist path relative to this file
+_HERE = os.path.dirname(os.path.abspath(__file__))
+GOBUSTER_WORDLIST = os.path.join(_HERE, "..", "wordlists", "http-directories-wordlist.txt")
 
 
 class GobusterInput(BaseModel):
