@@ -129,12 +129,31 @@ def _classify_sqlmap(arguments: dict[str, Any], base: str) -> str:
 
 
 def _classify_curl(arguments: dict[str, Any], base: str) -> str:
-    """curl — write methods or destructive payloads bump the class."""
+    """curl — write methods, destructive payloads, or internal targets bump the class."""
     method = str(arguments.get("method", "GET")).upper()
+    url = str(arguments.get("url", "")).lower()
     data = arguments.get("data") or ""
     if not isinstance(data, str):
         data = str(data)
     data_lower = data.lower()
+
+    # SSRF Protection: Identify internal targets
+    _INTERNAL_PATTERNS = [
+        r"localhost",
+        r"127\.0\.0\.1",
+        r"169\.254\.169\.254",
+        r"0\.0\.0\.0",
+        r"10\.\d+\.\d+\.\d+",
+        r"172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+",
+        r"192\.168\.\d+\.\d+",
+        r"2130706433", # Decimal localhost
+        r"2852039166", # Decimal 169.254.169.254
+    ]
+
+    for pattern in _INTERNAL_PATTERNS:
+        if re.search(pattern, url):
+            # Probing internal infrastructure is high-signal/high-risk Class C
+            return "C"
 
     for frag in _DESTRUCTIVE_PAYLOAD_FRAGMENTS:
         if frag in data_lower:
