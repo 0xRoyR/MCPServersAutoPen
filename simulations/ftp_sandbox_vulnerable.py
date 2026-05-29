@@ -9,9 +9,9 @@ Install:
     pip install pyftpdlib
 
 Run (port 21 needs root/admin):
-    sudo python ftp_sandbox.py                 # read-only anonymous (medium finding)
-    sudo python ftp_sandbox.py --writable      # writable anon dir (higher severity)
-    python ftp_sandbox.py --port 2121          # high port, no sudo (direct tool test only)
+    sudo python ftp_sandbox_vulnerable.py             # read-only anonymous (medium finding)
+    sudo python ftp_sandbox_vulnerable.py --writable  # writable anon dir (higher severity)
+    python ftp_sandbox_vulnerable.py --port 2121      # high port, no sudo (direct tool test only)
 
 Notes:
   * The AutoPen FTP agent hardcodes port 21, so a FULL-PIPELINE test must use
