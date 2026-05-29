@@ -60,6 +60,10 @@ class FtpAnonTool(BaseTool):
             "host": host,
             "port": data.port,
             "anonymous_allowed": False,
+            # True ONLY when the server is reachable but explicitly rejects the
+            # anonymous login (FTP 5xx / error_perm). Distinguishes a genuine
+            # "anonymous disabled" from a connection-level failure (down/unreachable).
+            "login_refused": False,
             "banner": "",
             "welcome": "",
             "login_code": "",
@@ -101,8 +105,10 @@ class FtpAnonTool(BaseTool):
                 ftp.close()
 
         except ftplib.error_perm as exc:
-            # Login refused (e.g. 530) — the expected, healthy result. Not vulnerable.
+            # Login refused (e.g. 530) — server is UP but rejects anonymous login.
+            # The expected, healthy result. Not vulnerable.
             result["error"] = f"login refused: {exc}"
+            result["login_refused"] = True
             _safe_close(ftp)
         except (socket.timeout, TimeoutError):
             result["error"] = f"timeout after {data.timeout}s — evaluated as not allowed"
