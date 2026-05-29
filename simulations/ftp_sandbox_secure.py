@@ -1,6 +1,6 @@
 """
 Local sandbox FTP server with anonymous login DISABLED — the "fixed" counterpart
-to ftp_sandbox.py. Use it to test the recheck agent's FIXED verdict.
+to ftp_sandbox_vulnerable.py. Use it to test the recheck agent's FIXED verdict.
 
 The server is fully up and serving (it answers the 220 banner and accepts a real
 user), but it has NO anonymous account — so an anonymous login attempt is met with
@@ -10,8 +10,8 @@ an FTP 530 rejection. That maps to:
     recheck agent       → verdict "fixed"  (server reachable, anon explicitly refused)
 
 Contrast with the three FTP states the recheck agent distinguishes:
-    ftp_sandbox.py running          → anonymous_allowed=True   → "vulnerable"
-    ftp_sandbox_secure.py running   → login_refused=True       → "fixed"      (this file)
+    ftp_sandbox_vulnerable.py running → anonymous_allowed=True  → "vulnerable"
+    ftp_sandbox_secure.py running     → login_refused=True      → "fixed"      (this file)
     nothing listening on :21        → connection refused       → "inconclusive"
 
 Install:
