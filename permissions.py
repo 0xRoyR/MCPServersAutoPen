@@ -183,6 +183,12 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
     "ftp_agent": [
         "run_ftp_anon_check",
     ],
+
+    # Recheck agent — re-verifies a single finding on demand. Needs the FTP tool
+    # to re-run anonymous-login checks for FTP findings (HTTP rechecks use local curl).
+    "recheck_agent": [
+        "run_ftp_anon_check",
+    ],
 }
 
 # Special sentinel: if agent_id is this value, all tools are allowed.
