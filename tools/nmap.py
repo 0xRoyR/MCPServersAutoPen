@@ -16,10 +16,15 @@ class NmapTool(BaseTool):
     input_model = NmapInput
 
     def run(self, data: NmapInput) -> ToolResult:
+        # NOTE: nmap currently runs with NO flags at all (no -sV, -T4, -F, or -p-)
+        # — the fuller scans were too heavy. This is a plain default scan
+        # (top-1000-port connect scan), which still detects port states such as
+        # 21/tcp open for the FTP agent. scan_type is accepted but ignored for
+        # now; re-introduce per-profile flags later — see TODO.md "Nmap scan depth".
         profiles = {
-            "quick": ["-T4", "-F"],
-            "ports": ["-p-", "-T4"],
-            "service": ["-sV", "-T4"],
+            "quick": [],
+            "ports": [],
+            "service": [],
         }
 
         cmd = ["nmap"] + profiles[data.scan_type] + [data.target]
