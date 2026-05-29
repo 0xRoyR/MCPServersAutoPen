@@ -178,6 +178,11 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_katana",
         "run_arjun",
     ],
+
+    # FTP — non-AI network agent (Full Assessment, domain/IP only)
+    "ftp_agent": [
+        "run_ftp_anon_check",
+    ],
 }
 
 # Special sentinel: if agent_id is this value, all tools are allowed.

@@ -45,6 +45,8 @@ _DEFAULT_TOOL_CLASS: dict[str, str] = {
     "run_paramspider":  "B",
     "run_arjun":        "B",
     "run_curl":         "B",
+    # Anonymous FTP login probe — active but read-only, no approval required
+    "run_ftp_anon_check": "B",
 
     # High-signal exploitation tooling — default C, escalates to D on mutation
     "run_sqlmap":       "C",

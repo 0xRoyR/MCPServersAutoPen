@@ -5,6 +5,7 @@ from tools.httpx import HttpxTool
 from tools.gobuster import GobusterTool
 from tools.curl import CurlTool
 from tools.verify_ssrf import VerifySSRFTool
+from tools.ftp_anon import FtpAnonTool
 from tools.sqlmap import SqlmapTool
 from tools.waybackurls import WaybackurlsTool
 from tools.katana import KatanaTool
@@ -25,6 +26,7 @@ TOOLS = [
     GobusterTool(),
     CurlTool(),
     VerifySSRFTool(),
+    FtpAnonTool(),
     SqlmapTool(),
     WaybackurlsTool(),
     KatanaTool(),
