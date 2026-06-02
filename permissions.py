@@ -20,6 +20,10 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_katana",
         "run_paramspider",
         "run_arjun",
+        "run_ffuf",
+        "run_nuclei",
+        "run_retirejs",
+        "run_browser",
     ],
 
     # Target profiling + account registration
@@ -35,10 +39,12 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_httpx",
     ],
 
-    # SQL Injection pipeline
+    # SQL Injection pipeline. sqli_agent also offers OS command injection (commix)
+    # via HITL when a parameter looks like it reaches a shell.
     "sqli_agent": [
         "run_curl",
         "run_sqlmap",
+        "run_commix",
     ],
     "sqli_recon_agent": [
         "run_curl",
@@ -49,13 +55,21 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_sqlmap",
     ],
 
-    # XSS pipeline
+    # XSS pipeline. The runtime XSS agent is the single-phase "xss_agent"; the
+    # *_recon/_exploit ids below are retained for the split-pipeline variant.
+    "xss_agent": [
+        "run_curl",
+        "run_dalfox",
+        "run_browser",
+    ],
     "xss_recon_agent": [
         "run_curl",
         "run_httpx",
+        "run_dalfox",
     ],
     "xss_exploit_agent": [
         "run_curl",
+        "run_dalfox",
     ],
 
     # SSRF pipeline
@@ -67,11 +81,20 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_curl",
     ],
 
-    # Information Disclosure pipeline
+    # Information Disclosure pipeline. The runtime agent is the single-phase
+    # "info_disclosure_agent", which also runs templated (nuclei) and SCA
+    # (retire.js) breadth scans and turns the matches into findings.
+    "info_disclosure_agent": [
+        "run_curl",
+        "run_nuclei",
+        "run_retirejs",
+    ],
     "info_disclosure_recon_agent": [
         "run_curl",
         "run_httpx",
         "run_gobuster",
+        "run_nuclei",
+        "run_retirejs",
     ],
     "info_disclosure_exploit_agent": [
         "run_curl",
@@ -88,9 +111,11 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_curl",
     ],
 
-    # Business Logic Errors (single-phase)
+    # Business Logic Errors (single-phase) — replays operator-approved
+    # value-manipulation writes via curl; ffuf for endpoint/value fuzzing.
     "logic_errors_agent": [
         "run_curl",
+        "run_ffuf",
     ],
 
     # Path Traversal / LFI pipeline
@@ -111,11 +136,18 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_curl",
     ],
 
-    # IDOR / BAC pipeline
+    # IDOR / BAC pipeline. The runtime IDOR agent is the single-phase "idor_agent",
+    # which fuzzes for hidden object endpoints (ffuf) and replays operator-approved
+    # cross-principal writes (curl); the *_recon/_exploit ids are the split variant.
+    "idor_agent": [
+        "run_curl",
+        "run_ffuf",
+    ],
     "idor_recon_agent": [
         "run_curl",
         "run_httpx",
         "run_gobuster",
+        "run_ffuf",
     ],
     "idor_exploit_agent": [
         "run_curl",

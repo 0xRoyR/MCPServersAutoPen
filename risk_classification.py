@@ -37,6 +37,8 @@ _DEFAULT_TOOL_CLASS: dict[str, str] = {
     "get_endpoints":        "A",
     "get_http_services":    "A",
     "get_subdomains":       "A",
+    # Software-composition analysis on fetched JS — passive, read-only
+    "run_retirejs":     "A",
 
     # Active probing, non-destructive
     "run_nmap":         "B",
@@ -45,11 +47,22 @@ _DEFAULT_TOOL_CLASS: dict[str, str] = {
     "run_paramspider":  "B",
     "run_arjun":        "B",
     "run_curl":         "B",
+    # Content/parameter/value fuzzer — active probing by default, escalates to C
+    # when fuzzing write-methods or payload positions (see _classify_ffuf).
+    "run_ffuf":         "B",
+    # Templated CVE/misconfig scanner — active probing, non-destructive
+    "run_nuclei":       "B",
+    # Headless browser render / DOM-XSS execution check — active, non-destructive
+    "run_browser":      "B",
     # Anonymous FTP login probe — active but read-only, no approval required
     "run_ftp_anon_check": "B",
 
     # High-signal exploitation tooling — default C, escalates to D on mutation
     "run_sqlmap":       "C",
+    # XSS discovery + payload generation — high-signal exploitation, approval required
+    "run_dalfox":       "C",
+    # OS command injection / RCE — destructive-capable, strictest approval
+    "run_commix":       "D",
 }
 
 
@@ -99,6 +112,9 @@ def classify(tool_name: str, arguments: dict[str, Any]) -> str:
     if tool_name == "run_curl":
         return _classify_curl(arguments, base)
 
+    if tool_name == "run_ffuf":
+        return _classify_ffuf(arguments, base)
+
     return base
 
 
@@ -110,7 +126,7 @@ def requires_approval(risk_class: str) -> bool:
 # ── Internal: per-tool classifiers ────────────────────────────────────────────
 
 def _classify_sqlmap(arguments: dict[str, Any], base: str) -> str:
-    """sqlmap — bump to D on destructive flags, keep at C on aggressive flags."""
+    """sqlmap — bump to D on destructive flags or data exfiltration (dump)."""
     blob = _stringify_args(arguments).lower()
 
     for flag in _SQLMAP_DESTRUCTIVE_FLAGS:
@@ -121,12 +137,48 @@ def _classify_sqlmap(arguments: dict[str, Any], base: str) -> str:
         if frag in blob:
             return "D"
 
+    # Data exfiltration is the highest-impact, hardest-to-reverse read action a
+    # human should sign off on with the stricter (class D) UX. The SqlmapInput
+    # model expresses a dump via structured boolean/string args (dump / dump_table
+    # / dump_db) — _stringify_args only flattens VALUES, so check the keys here —
+    # plus the raw --dump / --dump-all / -D / -T flags when passed inline.
+    if (arguments.get("dump") or arguments.get("dump_table") or arguments.get("dump_db")):
+        return "D"
+    if any(flag in blob for flag in ("--dump", "--dump-all", "--dump-table")):
+        return "D"
+
     for flag in _SQLMAP_AGGRESSIVE_FLAGS:
         if flag in blob:
             return "C"
 
     # Default sqlmap invocation with --risk=1/2 is still class C (its whole
     # purpose is confirming injection, which we want a human to approve).
+    return base
+
+
+def _classify_ffuf(arguments: dict[str, Any], base: str) -> str:
+    """ffuf — class B by default; escalate to C when fuzzing can mutate state.
+
+    Content/parameter discovery with GET is non-destructive (B). Fuzzing a
+    write-method (POST/PUT/PATCH/DELETE) or injecting payloads into a request
+    body can change state and is high-signal, so it requires approval (C).
+    """
+    method = str(arguments.get("method", "GET")).upper()
+    data = arguments.get("data") or arguments.get("body") or ""
+    if not isinstance(data, str):
+        data = str(data)
+
+    blob = _stringify_args(arguments).lower()
+    for frag in _DESTRUCTIVE_PAYLOAD_FRAGMENTS:
+        if frag in blob:
+            return "D"
+
+    if method in _WRITE_METHODS:
+        return "C"
+    # A FUZZ keyword inside a request body means payloads are being injected into
+    # the body — treat as a mutating/high-signal fuzz.
+    if data and "fuzz" in data.lower():
+        return "C"
     return base
 
 

@@ -11,6 +11,12 @@ from tools.waybackurls import WaybackurlsTool
 from tools.katana import KatanaTool
 from tools.paramspider import ParamSpiderTool
 from tools.arjun import ArjunTool
+from tools.dalfox import DalfoxTool
+from tools.ffuf import FfufTool
+from tools.commix import CommixTool
+from tools.nuclei import NucleiTool
+from tools.retirejs import RetireJsTool
+from tools.browser import BrowserTool
 from tools.query_recon import (
     GetAttackSurfaceTool,
     GetEndpointsTool,
@@ -32,6 +38,12 @@ TOOLS = [
     KatanaTool(),
     ParamSpiderTool(),
     ArjunTool(),
+    DalfoxTool(),
+    FfufTool(),
+    CommixTool(),
+    NucleiTool(),
+    RetireJsTool(),
+    BrowserTool(),
     GetAttackSurfaceTool(),
     GetEndpointsTool(),
     GetHttpServicesTool(),

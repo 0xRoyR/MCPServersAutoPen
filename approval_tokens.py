@@ -53,8 +53,26 @@ def _evict_old() -> None:
 
 # ── Token verification ────────────────────────────────────────────────────────
 
+_INSECURE_DEFAULT = "change-me-internal-key"
+
+
 def _shared_secret() -> bytes:
-    return os.environ.get("INTERNAL_API_KEY", "change-me-internal-key").encode("utf-8")
+    """Return the HMAC secret, refusing to operate with a missing/default key.
+
+    The approval-token HMAC is the whole basis of the human-in-the-loop gate: if
+    the secret is unset or left at the insecure default, anyone who knows that
+    default could forge a valid token for a class C/D action. We therefore
+    fail closed — no token is ever signed or verified with a guessable secret.
+    The same strong INTERNAL_API_KEY must be shared across the backend, agent
+    server, and MCP server.
+    """
+    key = os.environ.get("INTERNAL_API_KEY", "")
+    if not key or key == _INSECURE_DEFAULT:
+        raise RuntimeError(
+            "INTERNAL_API_KEY is not set (or is the insecure default); refusing to "
+            "verify approval tokens. Set a strong, shared INTERNAL_API_KEY."
+        )
+    return key.encode("utf-8")
 
 
 def sign(approval_id: str, fingerprint_hex: str, issued_at: int | None = None) -> str:
@@ -100,8 +118,14 @@ def verify(token: str, expected_fingerprint: str, max_age_seconds: int = 86_400)
     if issued_at + max_age_seconds < int(time.time()):
         return False, "token_expired"
 
+    try:
+        secret = _shared_secret()
+    except RuntimeError:
+        # Fail closed: an unset/default secret means we cannot trust ANY token.
+        return False, "secret_misconfigured"
+
     body = f"{approval_id}|{fingerprint_hex}|{issued_at}"
-    expected_mac = hmac.new(_shared_secret(), body.encode("utf-8"), hashlib.sha256).digest()
+    expected_mac = hmac.new(secret, body.encode("utf-8"), hashlib.sha256).digest()
     padded = mac_b64 + "=" * (-len(mac_b64) % 4)
     try:
         actual_mac = base64.urlsafe_b64decode(padded.encode("ascii"))
