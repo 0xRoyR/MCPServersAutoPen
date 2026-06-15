@@ -11,6 +11,43 @@ from execution.runner import run_command
 _DRIVER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "browser_driver.py")
 
 
+def _extract_first_json_object(text: str):
+    """Return the first balanced top-level JSON object in text, or None.
+
+    Walks from the first '{' tracking string literals and escapes so that braces
+    inside string values (e.g. a rendered DOM that contains a JSON blob) do not
+    confuse boundary detection. Robust against stray leading/trailing output.
+    """
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(start, len(text)):
+        c = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(text[start:i + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None
+
+
 def _driver_python() -> str:
     """Pick the interpreter for the browser driver subprocess.
 
@@ -102,14 +139,16 @@ class BrowserTool(BaseTool):
             return ToolResult(success=False, output=f"headless browser error: {e}")
 
         raw = (out or "").strip()
-        # The driver prints a single JSON object on stdout.
+        # The driver prints a single JSON object on stdout. Parse the whole string
+        # first; fall back to the first BALANCED {...} span. Do NOT scan by the last
+        # "{": the result embeds the rendered DOM, which routinely contains "{" (e.g.
+        # a JSON API response in the page body), so a naive last-brace search lands
+        # inside a string value and never parses.
         parsed = None
-        start = raw.rfind("{")
-        if start != -1:
-            try:
-                parsed = json.loads(raw[start:])
-            except json.JSONDecodeError:
-                parsed = None
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = _extract_first_json_object(raw)
         if parsed is None:
             return ToolResult(success=False, output=f"headless browser produced no parseable result. stderr:\n{(err or '')[:500]}")
 
