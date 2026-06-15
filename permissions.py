@@ -45,6 +45,7 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_curl",
         "run_sqlmap",
         "run_commix",
+        "run_browser",
     ],
     "sqli_recon_agent": [
         "run_curl",
@@ -100,15 +101,18 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_curl",
     ],
 
-    # Auth Bypass (single-phase)
+    # Auth Bypass (single-phase). run_browser lets it stream a live-theater frame
+    # of the weaponized privileged action (class B — non-destructive render).
     "auth_bypass_agent": [
         "run_curl",
         "run_sqlmap",
+        "run_browser",
     ],
 
     # Cookie / JWT manipulation (single-phase)
     "cookie_jwt_agent": [
         "run_curl",
+        "run_browser",
     ],
 
     # Business Logic Errors (single-phase) — replays operator-approved
@@ -116,6 +120,7 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
     "logic_errors_agent": [
         "run_curl",
         "run_ffuf",
+        "run_browser",
     ],
 
     # Path Traversal / LFI pipeline
@@ -142,6 +147,7 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
     "idor_agent": [
         "run_curl",
         "run_ffuf",
+        "run_browser",
     ],
     "idor_recon_agent": [
         "run_curl",
