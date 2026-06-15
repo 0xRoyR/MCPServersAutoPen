@@ -6,3 +6,11 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
+
+# Runtime artifacts / generated output
+*.db
+*.sqlite
+*.sqlite3
+pentest_report_*.pdf
+*.tmp
+*.log

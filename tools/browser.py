@@ -11,6 +11,29 @@ from execution.runner import run_command
 _DRIVER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "browser_driver.py")
 
 
+def _driver_python() -> str:
+    """Pick the interpreter for the browser driver subprocess.
+
+    The driver needs Playwright (and its browser binaries), which the project
+    installs into the repo venv per requirements.txt. The server may be launched
+    with a different interpreter (e.g. the system python3), where Playwright is
+    absent — so prefer the repo venv's python if it exists, and only fall back to
+    the current interpreter when no venv is present.
+    """
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    candidates = [
+        os.path.join(repo_root, ".venv", "bin", "python"),       # POSIX venv
+        os.path.join(repo_root, ".venv", "Scripts", "python.exe"),  # Windows venv
+    ]
+    for cand in candidates:
+        if os.path.exists(cand):
+            return cand
+    return sys.executable
+
+
+_DRIVER_PYTHON = _driver_python()
+
+
 class BrowserInput(BaseModel):
     url: str = Field(
         description=(
@@ -47,7 +70,7 @@ class BrowserTool(BaseTool):
 
     def run(self, data: BrowserInput) -> ToolResult:
         cmd = [
-            sys.executable, _DRIVER,
+            _DRIVER_PYTHON, _DRIVER,
             "--url", data.url,
             "--mode", data.mode,
             "--timeout", str(data.timeout),
