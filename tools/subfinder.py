@@ -68,8 +68,17 @@ class SubfinderTool(BaseTool):
         if code != 0:
             return ToolResult(success=False, output=err)
 
-        # If scan_uuid + target_uuid provided, persist to DB
-        if data.scan_uuid and data.target_uuid and out:
+        # If scan_uuid + target_uuid provided AND the DB is reachable, persist;
+        # otherwise fall through and return raw output (the documented fallback)
+        # instead of reporting a phantom "saved 0" success.
+        db_mode = bool(data.scan_uuid and data.target_uuid and out)
+        if db_mode:
+            try:
+                from db.connection import db_available
+                db_mode = db_available()
+            except Exception:
+                db_mode = False
+        if db_mode:
             try:
                 from db import get_repo
                 from scope_filter import is_in_scope

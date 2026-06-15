@@ -65,6 +65,13 @@ class WaybackurlsTool(BaseTool):
 
     def run(self, data: WaybackurlsInput) -> ToolResult:
         db_mode = bool(data.scan_uuid and data.target_uuid)
+        if db_mode:
+            # Degrade to raw-output mode when the DB is unreachable (see katana.py).
+            try:
+                from db.connection import db_available
+                db_mode = db_available()
+            except Exception:
+                db_mode = False
         domains_to_query = []
 
         if db_mode and not data.domain:

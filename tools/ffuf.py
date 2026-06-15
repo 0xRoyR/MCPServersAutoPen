@@ -114,6 +114,13 @@ class FfufTool(BaseTool):
         # the URL path, mirroring gobuster's endpoint persistence).
         db_mode = bool(data.scan_uuid and data.target_uuid and "FUZZ" in data.url)
         if db_mode:
+            # Degrade to raw-output mode when the DB is unreachable (see katana.py).
+            try:
+                from db.connection import db_available
+                db_mode = db_available()
+            except Exception:
+                db_mode = False
+        if db_mode:
             try:
                 from db import get_repo
                 from scope_filter import is_in_scope

@@ -98,6 +98,15 @@ class KatanaTool(BaseTool):
 
     def run(self, data: KatanaInput) -> ToolResult:
         db_mode = bool(data.scan_uuid and data.target_uuid)
+        if db_mode:
+            # Gate on a live connection: when the DB is unreachable (or pymysql is
+            # absent), degrade to raw-output mode rather than running the persist
+            # path and reporting a phantom "saved 0" success that hides the failure.
+            try:
+                from db.connection import db_available
+                db_mode = db_available()
+            except Exception:
+                db_mode = False
         targets: list[str] = []
 
         if db_mode and not data.url:

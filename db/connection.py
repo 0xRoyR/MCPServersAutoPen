@@ -55,6 +55,16 @@ def _check_db_enabled() -> bool:
     return _db_enabled
 
 
+def db_available() -> bool:
+    """True only if a live MySQL connection can be obtained right now.
+
+    db_mode tools gate on this so that when the DB is unreachable they degrade
+    to raw-output mode (the documented fallback) instead of running the persist
+    path and reporting a phantom "saved 0" success that hides the failure.
+    """
+    return get_connection() is not None
+
+
 def get_connection() -> Optional[pymysql.connections.Connection]:
     """
     Return a thread-local MySQL connection, reconnecting if needed.
