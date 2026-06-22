@@ -83,6 +83,7 @@ class BrowserInput(BaseModel):
     canary: Optional[str] = Field(default=None, description="Unique token your payload triggers (e.g. inside alert()). Execution is confirmed when it appears in a dialog/console/error.")
     cookies: Optional[str] = Field(default=None, description="Cookie string for authenticated rendering (e.g. 'session=abc; token=xyz').")
     headers: Optional[dict] = Field(default=None, description="Extra HTTP headers (e.g. {'Authorization': 'Bearer ...'}).")
+    local_storage: Optional[dict] = Field(default=None, description="Key/value pairs seeded into the page's localStorage AND sessionStorage before scripts run — e.g. {'token': '<jwt>'} to make a SPA (Angular/React) boot authenticated. Cookies/headers alone do NOT log a SPA in; it reads its token from storage.")
     timeout: int = Field(default=15, description="Navigation timeout in seconds.")
     wait_ms: int = Field(default=2500, description="Milliseconds to let client-side JS settle after load.")
     max_time: int = Field(default=60, description="Maximum total execution time in seconds.")
@@ -119,6 +120,8 @@ class BrowserTool(BaseTool):
             cmd += ["--cookies", data.cookies]
         for k, v in (data.headers or {}).items():
             cmd += ["--header", f"{k}: {v}"]
+        for k, v in (data.local_storage or {}).items():
+            cmd += ["--local-storage", f"{k}={v}"]
         # The driver owns the headed decision (theater-by-default + the
         # AUTOPEN_HEADED_BROWSER env it inherits from this process); we only forward
         # an explicit per-call request.

@@ -39,6 +39,9 @@ def main() -> None:
     ap.add_argument("--canary", default="")
     ap.add_argument("--cookies", default="")          # "k=v; k2=v2"
     ap.add_argument("--header", action="append", default=[])  # "K: V"
+    ap.add_argument("--local-storage", action="append", default=[],  # "k=v"
+                    help="key=value to seed into localStorage+sessionStorage before page scripts run "
+                         "(e.g. token=<jwt> so a SPA boots authenticated)")
     ap.add_argument("--timeout", type=int, default=15)
     ap.add_argument("--wait", type=int, default=2500)  # ms to settle after load
     ap.add_argument("--headed", action="store_true", help="Launch a VISIBLE browser window")
@@ -81,6 +84,12 @@ def main() -> None:
             k, v = h.split(":", 1)
             extra_headers[k.strip()] = v.strip()
 
+    local_storage = {}
+    for kv in args.local_storage:
+        if "=" in kv:
+            k, v = kv.split("=", 1)   # split once: JWT values may themselves contain '='
+            local_storage[k.strip()] = v.strip()
+
     def _launch(p, want_headed: bool):
         return p.chromium.launch(
             headless=not want_headed,
@@ -97,6 +106,19 @@ def main() -> None:
                 # screenshot filmstrip still works even without a desktop on the VM.
                 browser = _launch(p, False)
             context = browser.new_context(ignore_https_errors=True, extra_http_headers=extra_headers or None)
+            # Seed localStorage/sessionStorage BEFORE any page script runs, so SPAs
+            # (Angular/React, e.g. Juice Shop) that read their auth token from storage
+            # boot authenticated. An HTTP header or cookie does NOT log such an app in —
+            # its interceptor reads localStorage.token and only then attaches the Bearer
+            # header to its own XHR calls. Runs on every document; about:blank has an
+            # opaque origin where storage access throws, hence the try/catch.
+            if local_storage:
+                kv_json = json.dumps(local_storage)
+                context.add_init_script(
+                    "(() => { try { const __kv = " + kv_json + ";"
+                    " for (const k in __kv) { window.localStorage.setItem(k, __kv[k]);"
+                    " window.sessionStorage.setItem(k, __kv[k]); } } catch (e) {} })();"
+                )
             if args.cookies:
                 from urllib.parse import urlparse
                 host = urlparse(args.url).hostname or ""
