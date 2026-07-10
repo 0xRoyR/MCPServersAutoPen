@@ -56,6 +56,14 @@ AGENT_PERMISSIONS: dict[str, list[str]] = {
         "run_sqlmap",
     ],
 
+    # NoSQL Injection pipeline (single-phase "nosqli_agent"). Operator/boolean/error
+    # injection detection via run_nosqlmap; manual operator/$regex exploitation
+    # replays through curl.
+    "nosqli_agent": [
+        "run_curl",
+        "run_nosqlmap",
+    ],
+
     # XSS pipeline. The runtime XSS agent is the single-phase "xss_agent"; the
     # *_recon/_exploit ids below are retained for the split-pipeline variant.
     "xss_agent": [

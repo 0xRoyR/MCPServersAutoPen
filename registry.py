@@ -7,6 +7,7 @@ from tools.curl import CurlTool
 from tools.verify_ssrf import VerifySSRFTool
 from tools.ftp_anon import FtpAnonTool
 from tools.sqlmap import SqlmapTool
+from tools.nosqlmap import NoSqlmapTool
 from tools.waybackurls import WaybackurlsTool
 from tools.katana import KatanaTool
 from tools.paramspider import ParamSpiderTool
@@ -34,6 +35,7 @@ TOOLS = [
     VerifySSRFTool(),
     FtpAnonTool(),
     SqlmapTool(),
+    NoSqlmapTool(),
     WaybackurlsTool(),
     KatanaTool(),
     ParamSpiderTool(),

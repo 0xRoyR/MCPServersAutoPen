@@ -9,3 +9,12 @@ playwright==1.60.0
 
 # Optional — only needed for the DB-backed recon-query tools (server runs without a DB).
 pymysql==1.2.0
+
+# ── External (non-pip) tool dependencies ─────────────────────────────────────
+# pip cannot install these — they are Go/apt binaries the MCP tools shell out to.
+# The one-command installer  ../setup.sh  installs them all; see ../UBUNTU_SETUP.md.
+#
+# run_nosqlmap  : self-contained — needs NOTHING beyond `requests` above. The Go
+#                 tool below is an OPTIONAL corroborator for GET targets:
+#                     go install github.com/Charlie-belmer/nosqli@latest
+# run_browser   : playwright (above) + browsers →  playwright install --with-deps chromium

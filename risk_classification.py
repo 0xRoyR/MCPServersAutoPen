@@ -57,6 +57,12 @@ _DEFAULT_TOOL_CLASS: dict[str, str] = {
     # Anonymous FTP login probe — active but read-only, no approval required
     "run_ftp_anon_check": "B",
 
+    # NoSQL (MongoDB-style) injection probe — parity with sqlmap: detection is
+    # class C (its whole purpose is confirming injection, which we want a human to
+    # approve). The `enumerate` blind-extraction PoC exfiltrates data and escalates
+    # to D (see _classify_nosqlmap).
+    "run_nosqlmap":     "C",
+
     # High-signal exploitation tooling — default C, escalates to D on mutation
     "run_sqlmap":       "C",
     # XSS discovery + payload generation — high-signal exploitation, approval required
@@ -109,6 +115,9 @@ def classify(tool_name: str, arguments: dict[str, Any]) -> str:
     if tool_name == "run_sqlmap":
         return _classify_sqlmap(arguments, base)
 
+    if tool_name == "run_nosqlmap":
+        return _classify_nosqlmap(arguments, base)
+
     if tool_name == "run_curl":
         return _classify_curl(arguments, base)
 
@@ -153,6 +162,22 @@ def _classify_sqlmap(arguments: dict[str, Any], base: str) -> str:
 
     # Default sqlmap invocation with --risk=1/2 is still class C (its whole
     # purpose is confirming injection, which we want a human to approve).
+    return base
+
+
+def _classify_nosqlmap(arguments: dict[str, Any], base: str) -> str:
+    """nosqlmap — parity with sqlmap: detection is class C; blind data extraction (enumerate) is D."""
+    blob = _stringify_args(arguments).lower()
+
+    for frag in _DESTRUCTIVE_PAYLOAD_FRAGMENTS:
+        if frag in blob:
+            return "D"
+
+    # `enumerate` performs blind $regex data extraction — exfiltration gets the
+    # strictest (class D) approval UX, exactly like sqlmap's --dump.
+    if arguments.get("enumerate"):
+        return "D"
+
     return base
 
 
