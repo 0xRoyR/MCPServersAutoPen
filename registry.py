@@ -4,6 +4,7 @@ from tools.subfinder import SubfinderTool
 from tools.httpx import HttpxTool
 from tools.gobuster import GobusterTool
 from tools.curl import CurlTool
+from tools.browser import BrowserTool
 from tools.verify_ssrf import VerifySSRFTool
 from tools.ftp_anon import FtpAnonTool
 from tools.sqlmap import SqlmapTool
@@ -36,4 +37,5 @@ TOOLS = [
     GetEndpointsTool(),
     GetHttpServicesTool(),
     GetSubdomainsTool(),
+    BrowserTool(),
 ]
