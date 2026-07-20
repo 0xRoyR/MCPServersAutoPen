@@ -6,7 +6,8 @@ from urllib.parse import urlparse
 from tools.base import BaseTool, ToolResult
 from execution.runner import run_command
 
-GOBUSTER_WORDLIST = "/usr/share/dirb/wordlists/small.txt"
+#GOBUSTER_WORDLIST = "/usr/share/dirb/wordlists/small.txt"
+GOBUSTER_WORDLIST = "MCPServersAutoPen\wordlists\http-directories-wordlist.txt"
 
 
 class GobusterInput(BaseModel):
